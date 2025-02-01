@@ -29,8 +29,8 @@ typedef struct trace_instr_format
     unsigned long long int destination_memory_address[NUM_INSTR_DESTINATIONS]; // output memory
     unsigned long long int source_memory_address[NUM_INSTR_SOURCES];           // input memory
 
-    unsigned int destination_memory_size[NUM_INSTR_DESTINATIONS];
-    unsigned int source_memory_size[NUM_INSTR_SOURCES];
+    unsigned int destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
+    unsigned int source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
 
     unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS]; // output memory values
     unsigned char *source_memory_value[NUM_INSTR_SOURCES];           // input memory values
@@ -137,7 +137,35 @@ void EndInstruction()
 
         if (instrCount <= (KnobTraceInstructions.Value() + KnobSkipInstructions.Value()))
         {
-            fwrite(&curr_instr, sizeof(trace_instr_format_t), 1, out);
+            fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
+            fwrite(&curr_instr.is_branch, sizeof(unsigned char), 1, out);
+            fwrite(&curr_instr.branch_taken, sizeof(unsigned char), 1, out);
+            fwrite(curr_instr.destination_register, sizeof(unsigned char), NUM_INSTR_DESTINATIONS, out);
+            fwrite(curr_instr.source_register, sizeof(unsigned char), NUM_INSTR_SOURCES, out);
+            fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
+            fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
+            fwrite(curr_instr.destination_memory_size, sizeof(unsigned int), NUM_INSTR_DESTINATIONS, out);
+            fwrite(curr_instr.source_memory_size, sizeof(unsigned int), NUM_INSTR_SOURCES, out);
+
+            for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            {
+                if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+                {
+                    fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
+                    delete curr_instr.destination_memory_value[i];
+                    curr_instr.destination_memory_value[i] = nullptr;
+                }
+            }
+
+            for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            {
+                if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                {
+                    fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
+                    delete curr_instr.source_memory_value[i];
+                    curr_instr.source_memory_value[i] = nullptr;
+                }
+            }
         }
         else
         {
@@ -516,7 +544,7 @@ int main(int argc, char *argv[])
 
     const char *fileName = KnobOutputFile.Value().c_str();
 
-    out = fopen(fileName, "ab");
+    out = fopen(fileName, "wb");
     if (!out)
     {
         std::cout << "Couldn't open output trace file. Exiting." << std::endl;
