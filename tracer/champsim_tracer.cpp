@@ -20,20 +20,20 @@ typedef struct trace_instr_format
 {
     unsigned long long int ip; // instruction pointer (program counter) value
 
-    unsigned char is_branch;    // is this branch
-    unsigned char branch_taken; // if so, is this taken
+    unsigned char has_mem_is_branch; // does this have memory operands(second bit), is this branch(LSB bit)
+    unsigned char branch_taken;      // if so, is this taken
 
     unsigned char destination_register[NUM_INSTR_DESTINATIONS]; // output registers
     unsigned char source_register[NUM_INSTR_SOURCES];           // input registers
 
-    unsigned long long int destination_memory_address[NUM_INSTR_DESTINATIONS]; // output memory
-    unsigned long long int source_memory_address[NUM_INSTR_SOURCES];           // input memory
+    unsigned long long int *destination_memory_address; // output memory
+    unsigned long long int *source_memory_address;      // input memory
 
-    unsigned int destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
-    unsigned int source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
+    uint8_t *destination_memory_size; // output memory sizes
+    uint8_t *source_memory_size;      // input memory sizes
 
-    unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS]; // output memory values
-    unsigned char *source_memory_value[NUM_INSTR_SOURCES];           // input memory values
+    unsigned char **destination_memory_value; // output memory values
+    unsigned char **source_memory_value;      // input memory values
 } trace_instr_format_t;
 
 /* ================================================================== */
@@ -87,7 +87,7 @@ INT32 Usage()
 // Analysis routines
 /* ===================================================================== */
 
-void BeginInstruction(VOID *ip, uint32_t op_code, VOID *opstring)
+void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, VOID *opstring)
 {
     instrCount++;
 
@@ -104,23 +104,63 @@ void BeginInstruction(VOID *ip, uint32_t op_code, VOID *opstring)
 
     curr_instr.ip = (unsigned long long int)ip;
 
-    curr_instr.is_branch = 0;
+    bool hasMemory = (numMemOperands != 0);
+
+    if (hasMemory)
+    {
+        curr_instr.has_mem_is_branch = 0b00000010;
+    }
+    else
+    {
+        curr_instr.has_mem_is_branch = 0;
+    }
     curr_instr.branch_taken = 0;
 
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
     {
         curr_instr.destination_register[i] = 0;
-        curr_instr.destination_memory_address[i] = 0;
-        curr_instr.destination_memory_size[i] = 0;
-        curr_instr.destination_memory_value[i] = nullptr;
     }
 
     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
     {
         curr_instr.source_register[i] = 0;
-        curr_instr.source_memory_address[i] = 0;
-        curr_instr.source_memory_size[i] = 0;
-        curr_instr.source_memory_value[i] = nullptr;
+    }
+
+    if (hasMemory)
+    {
+        curr_instr.destination_memory_address = new unsigned long long int[NUM_INSTR_DESTINATIONS];
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            curr_instr.destination_memory_address[i] = 0;
+
+        curr_instr.source_memory_address = new unsigned long long int[NUM_INSTR_SOURCES];
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            curr_instr.source_memory_address[i] = 0;
+
+        curr_instr.destination_memory_size = new uint8_t[NUM_INSTR_DESTINATIONS];
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            curr_instr.destination_memory_size[i] = 0;
+
+        curr_instr.source_memory_size = new uint8_t[NUM_INSTR_SOURCES];
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            curr_instr.source_memory_size[i] = 0;
+
+        curr_instr.destination_memory_value = new unsigned char *[NUM_INSTR_DESTINATIONS];
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            curr_instr.destination_memory_value[i] = nullptr;
+
+        curr_instr.source_memory_value = new unsigned char *[NUM_INSTR_SOURCES];
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            curr_instr.source_memory_value[i] = nullptr;
+    }
+    else
+    {
+        curr_instr.destination_memory_address = nullptr;
+        curr_instr.destination_memory_size = nullptr;
+        curr_instr.destination_memory_value = nullptr;
+
+        curr_instr.source_memory_address = nullptr;
+        curr_instr.source_memory_size = nullptr;
+        curr_instr.source_memory_value = nullptr;
     }
 
     memoryWriteIndex = -1;
@@ -138,32 +178,37 @@ void EndInstruction()
         if (instrCount <= (KnobTraceInstructions.Value() + KnobSkipInstructions.Value()))
         {
             fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
-            fwrite(&curr_instr.is_branch, sizeof(unsigned char), 1, out);
+            fwrite(&curr_instr.has_mem_is_branch, sizeof(unsigned char), 1, out);
             fwrite(&curr_instr.branch_taken, sizeof(unsigned char), 1, out);
             fwrite(curr_instr.destination_register, sizeof(unsigned char), NUM_INSTR_DESTINATIONS, out);
             fwrite(curr_instr.source_register, sizeof(unsigned char), NUM_INSTR_SOURCES, out);
-            fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
-            fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
-            fwrite(curr_instr.destination_memory_size, sizeof(unsigned int), NUM_INSTR_DESTINATIONS, out);
-            fwrite(curr_instr.source_memory_size, sizeof(unsigned int), NUM_INSTR_SOURCES, out);
 
-            for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
             {
-                if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+
+                fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
+                fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
+                fwrite(curr_instr.destination_memory_size, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, out);
+                fwrite(curr_instr.source_memory_size, sizeof(uint8_t), NUM_INSTR_SOURCES, out);
+
+                for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
                 {
-                    fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
-                    delete curr_instr.destination_memory_value[i];
-                    curr_instr.destination_memory_value[i] = nullptr;
+                    if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+                    {
+                        fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
+                        delete curr_instr.destination_memory_value[i];
+                        curr_instr.destination_memory_value[i] = nullptr;
+                    }
                 }
-            }
 
-            for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-            {
-                if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                for (int i = 0; i < NUM_INSTR_SOURCES; i++)
                 {
-                    fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
-                    delete curr_instr.source_memory_value[i];
-                    curr_instr.source_memory_value[i] = nullptr;
+                    if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                    {
+                        fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
+                        delete curr_instr.source_memory_value[i];
+                        curr_instr.source_memory_value[i] = nullptr;
+                    }
                 }
             }
         }
@@ -186,7 +231,7 @@ void EndInstruction()
 
 void BranchOrNot(uint32_t taken)
 {
-    curr_instr.is_branch = 1;
+    curr_instr.has_mem_is_branch |= 0b00000001;
     if (taken != 0)
     {
         curr_instr.branch_taken = 1;
@@ -414,11 +459,14 @@ void MemoryWriteValueForCall()
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID *v)
 {
+    uint32_t memOperands = INS_MemoryOperandCount(ins);
+
     // begin each instruction with this function
     uint32_t opcode = INS_Opcode(ins);
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction,
                    IARG_INST_PTR,
                    IARG_UINT32, opcode,
+                   IARG_UINT32, memOperands,
                    IARG_CALL_ORDER, CALL_ORDER_FIRST,
                    IARG_END);
 
@@ -453,7 +501,6 @@ VOID Instruction(INS ins, VOID *v)
     }
 
     // instrument memory reads and writes
-    uint32_t memOperands = INS_MemoryOperandCount(ins);
 
     // Iterate over each memory operand of the instruction.
     for (uint32_t memOp = 0; memOp < memOperands; memOp++)

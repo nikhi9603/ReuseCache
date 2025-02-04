@@ -200,6 +200,12 @@ public:
     uint64_t source_memory[NUM_INSTR_SOURCES];                 // input memory
     // int source_memory_outstanding[NUM_INSTR_SOURCES];  // a value of 2 here means the load hasn't been issued yet, 1 means it has been issued, but not returned yet, and 0 means it has returned
 
+    uint destination_memory_size[NUM_INSTR_DESTINATIONS_SPARC];
+    uint source_memory_size[NUM_INSTR_SOURCES];
+
+    unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS_SPARC];
+    unsigned char *source_memory_value[NUM_INSTR_SOURCES];
+
     // keep around a record of what the original virtual addresses were
     uint64_t destination_virtual_address[NUM_INSTR_DESTINATIONS_SPARC];
     uint64_t source_virtual_address[NUM_INSTR_SOURCES];

@@ -19,8 +19,8 @@ public:
     uint64_t destination_memory[NUM_INSTR_DESTINATIONS]; // output memory
     uint64_t source_memory[NUM_INSTR_SOURCES];           // input memory
 
-    uint destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
-    uint source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
+    uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
+    uint8_t source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
 
     unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS]; // output memory values
     unsigned char *source_memory_value[NUM_INSTR_SOURCES];           // input memory values
@@ -51,9 +51,7 @@ public:
     static size_t get_size()
     {
         return sizeof(ip) + sizeof(is_branch) + sizeof(branch_taken) +
-               sizeof(destination_registers) + sizeof(source_registers) +
-               sizeof(destination_memory) + sizeof(source_memory) +
-               sizeof(destination_memory_size) + sizeof(source_memory_size);
+               sizeof(destination_registers) + sizeof(source_registers);
     }
 };
 
@@ -71,21 +69,25 @@ int main(int argc, char **argv)
 
     while (fread(&trace_read_instr, instr_size, 1, trace))
     {
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+        bool hasMemOperands = ((trace_read_instr.is_branch & 0b00000010) == 2);
+        if (hasMemOperands)
         {
-            if (trace_read_instr.destination_memory_size[i] > 0)
+            for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
             {
-                trace_read_instr.destination_memory_value[i] = new unsigned char[trace_read_instr.destination_memory_size[i]];
-                fread(trace_read_instr.destination_memory_value[i], trace_read_instr.destination_memory_size[i], 1, trace);
+                if (trace_read_instr.destination_memory_size[i] > 0)
+                {
+                    trace_read_instr.destination_memory_value[i] = new unsigned char[trace_read_instr.destination_memory_size[i]];
+                    fread(trace_read_instr.destination_memory_value[i], trace_read_instr.destination_memory_size[i], 1, trace);
+                }
             }
-        }
 
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-        {
-            if (trace_read_instr.source_memory_size[i] > 0)
+            for (int i = 0; i < NUM_INSTR_SOURCES; i++)
             {
-                trace_read_instr.source_memory_value[i] = new unsigned char[trace_read_instr.source_memory_size[i]];
-                fread(trace_read_instr.source_memory_value[i], trace_read_instr.source_memory_size[i], 1, trace);
+                if (trace_read_instr.source_memory_size[i] > 0)
+                {
+                    trace_read_instr.source_memory_value[i] = new unsigned char[trace_read_instr.source_memory_size[i]];
+                    fread(trace_read_instr.source_memory_value[i], trace_read_instr.source_memory_size[i], 1, trace);
+                }
             }
         }
 
