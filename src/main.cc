@@ -45,6 +45,8 @@ uint64_t warmup_instructions = 10000000,
          simulation_instructions = 10000000,
          champsim_seed, occupancy_zero_cycle;
 
+bool use_reuse_cache_llc = false;
+
 extern int reg_instruction_pointer, reg_stack_pointer, reg_flags; // From src/ooo_cpu.cc
 
 FILE *context_switch_file;
@@ -1044,6 +1046,7 @@ int main(int argc, char **argv)
                 {"low_bandwidth", no_argument, 0, 'b'},
                 {"traces", no_argument, 0, 't'},
                 {"context_switch", required_argument, 0, 's'},
+                {"reuse_cache_llc", no_argument, 0, 'r'},
                 {0, 0, 0, 0}};
 
         int option_index = 0;
@@ -1085,6 +1088,9 @@ int main(int argc, char **argv)
             reg_instruction_pointer = 103;
             reg_stack_pointer = 102;
             reg_flags = 64;
+            break;
+        case 'r':
+            use_reuse_cache_llc = true;
             break;
         default:
             abort();
@@ -1393,7 +1399,7 @@ int main(int argc, char **argv)
         uncore.LLC->upper_level_dcache[i] = &ooo_cpu[i].L2C;
         uncore.LLC->lower_level = &uncore.DRAM;
 
-        uncore.LLC->initialize_replacement = &CACHE::llc_initialize_replacement;
+        uncore.LLC->initialize_replacement = static_cast<void (CACHE::*)()>(&REUSE_CACHE_LLC::reuse_cache_llc_initialize_replacement);
         uncore.LLC->update_replacement_state = &CACHE::llc_update_replacement_state;
         uncore.LLC->find_victim = &CACHE::llc_find_victim;
         uncore.LLC->replacement_final_stats = &CACHE::llc_replacement_final_stats;

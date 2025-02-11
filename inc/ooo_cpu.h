@@ -2,6 +2,7 @@
 #define OOO_CPU_H
 
 #include "cache.h"
+#include "reuse_cache_llc.h"
 #include "page_table_walker.h"
 
 #ifdef CRC2_COMPILE

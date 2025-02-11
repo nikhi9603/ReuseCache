@@ -191,16 +191,21 @@ public:
         LATENCY = 0;
 
         // cache block
-        block = new BLOCK *[NUM_SET];
-        for (uint32_t i = 0; i < NUM_SET; i++)
+        if (NUM_SET > 0)
         {
-            block[i] = new BLOCK[NUM_WAY];
-
-            for (uint32_t j = 0; j < NUM_WAY; j++)
+            block = new BLOCK *[NUM_SET];
+            for (uint32_t i = 0; i < NUM_SET; i++)
             {
-                block[i][j].lru = j;
+                block[i] = new BLOCK[NUM_WAY];
+
+                for (uint32_t j = 0; j < NUM_WAY; j++)
+                {
+                    block[i][j].lru = j;
+                }
             }
         }
+        else
+            block = nullptr;
 
         for (uint32_t i = 0; i < NUM_CPUS; i++)
         {
@@ -308,20 +313,27 @@ public:
     uint32_t get_occupancy(uint8_t queue_type, uint64_t address),
         get_size(uint8_t queue_type, uint64_t address);
 
-    int check_hit(PACKET *packet),
-        invalidate_entry(uint64_t inval_addr),
-        check_mshr(PACKET *packet),
+    virtual int check_hit(PACKET *packet),
+        invalidate_entry(uint64_t inval_addr);
+    int check_mshr(PACKET *packet),
         prefetch_line(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int prefetch_fill_level, uint32_t prefetch_metadata) /* Neelu: commenting, uint64_t prefetch_id)*/,
         kpc_prefetch_line(uint64_t base_addr, uint64_t pf_addr, int prefetch_fill_level, int delta, int depth, int signature, int confidence, uint32_t prefetch_metadata),
         prefetch_translation(uint64_t ip, uint64_t pf_addr, int pf_fill_level, uint32_t prefetch_metadata, uint64_t prefetch_id, uint8_t instruction),
         check_nonfifo_queue(PACKET_QUEUE *queue, PACKET *packet, bool packet_direction); //@Vishal: Updated from check_mshr
 
-    void handle_fill(),
+    virtual void handle_fill(),
         handle_writeback(),
-        handle_read(),
-        handle_prefetch(),
-        flush_TLB(),
-        handle_processed();
+        handle_read();
+    void handle_processed();
+
+    void handle_prefetch(),
+        flush_TLB();
+
+    virtual void lru_update(uint32_t set, uint32_t way);
+    void fill_cache(uint32_t set, uint32_t way, PACKET *packet);
+
+    virtual uint32_t get_set(uint64_t address);
+    uint32_t get_way(uint64_t address, uint32_t set);
 
     void add_nonfifo_queue(PACKET_QUEUE *queue, PACKET *packet), //@Vishal: Updated from add_mshr
         update_fill_cycle(),
@@ -349,9 +361,6 @@ public:
         itlb_update_replacement_state(uint32_t cpu, uint32_t set, uint32_t way, uint64_t full_addr, uint64_t ip, uint64_t victim_addr, uint32_t type, uint8_t hit),
         dtlb_update_replacement_state(uint32_t cpu, uint32_t set, uint32_t way, uint64_t full_addr, uint64_t ip, uint64_t victim_addr, uint32_t type, uint8_t hit),
         stlb_update_replacement_state(uint32_t cpu, uint32_t set, uint32_t way, uint64_t full_addr, uint64_t ip, uint64_t victim_addr, uint32_t type, uint8_t hit),
-
-        lru_update(uint32_t set, uint32_t way),
-        fill_cache(uint32_t set, uint32_t way, PACKET *packet),
 
         (CACHE::*replacement_final_stats)(),
 
@@ -400,10 +409,7 @@ public:
         l2c_prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr, uint32_t metadata_in),
         llc_prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr, uint32_t metadata_in);
 
-    uint32_t get_set(uint64_t address),
-        get_way(uint64_t address, uint32_t set),
-
-        (CACHE::*find_victim)(uint32_t cpu, uint64_t instr_id, uint32_t set, const BLOCK *current_set, uint64_t ip, uint64_t full_addr, uint32_t type),
+    uint32_t (CACHE::*find_victim)(uint32_t cpu, uint64_t instr_id, uint32_t set, const BLOCK *current_set, uint64_t ip, uint64_t full_addr, uint32_t type),
         base_find_victim(uint32_t cpu, uint64_t instr_id, uint32_t set, const BLOCK *current_set, uint64_t ip, uint64_t full_addr, uint32_t type),
         btb_find_victim(uint32_t cpu, uint64_t instr_id, uint32_t set, const BLOCK *current_set, uint64_t ip, uint64_t full_addr, uint32_t type),
         l1i_find_victim(uint32_t cpu, uint64_t instr_id, uint32_t set, const BLOCK *current_set, uint64_t ip, uint64_t full_addr, uint32_t type),
