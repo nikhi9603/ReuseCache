@@ -600,7 +600,7 @@ void CACHE::handle_fill()
                             l2c_mpki = (ooo_cpu[fill_cpu].L2C.sim_miss[fill_cpu][0] * 1000) / (ooo_cpu[fill_cpu].num_retired);
                     /*			if((((temp_metadata >> 17) & 1) | ((temp_metadata >> 18) & 1)) == 1)
                                 getting_hint_from_l2++;*/
-                    uncore.LLC.llc_prefetcher_operate(phy_addr << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].ip, 0, 6, temp_metadata);
+                    uncore.LLC->llc_prefetcher_operate(phy_addr << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].ip, 0, 6, temp_metadata);
                 }
             }
 #endif
@@ -1593,7 +1593,7 @@ void CACHE::handle_read()
                                 l2c_data_hit++;
                             else
                             {
-                                hit_way = uncore.LLC.check_hit(&to_check_hit);
+                                hit_way = uncore.LLC->check_hit(&to_check_hit);
                                 if (hit_way >= 0)
                                     llc_data_hit++;
                                 else
@@ -1626,7 +1626,7 @@ void CACHE::handle_read()
                     if(ooo_cpu[read_cpu].num_retired > 0)
                     l2c_mpki = (ooo_cpu[read_cpu].L2C.sim_miss[read_cpu][0]*1000)/(ooo_cpu[read_cpu].num_retired);
 
-                    uncore.LLC.llc_prefetcher_operate(phy_addr<<LOG2_BLOCK_SIZE, RQ.entry[index].ip, 0, 6, temp_metadata, l2c_mpki); //ooo_cpu[read_cpu].L2C.l2c_pref_accuracy);
+                    uncore.LLC->llc_prefetcher_operate(phy_addr<<LOG2_BLOCK_SIZE, RQ.entry[index].ip, 0, 6, temp_metadata, l2c_mpki); //ooo_cpu[read_cpu].L2C.l2c_pref_accuracy);
                     //	if((((temp_metadata >> 17) & 1) | ((temp_metadata >> 18) & 1)) == 1)
                     //	{
                     //		getting_hint_from_l2++;
