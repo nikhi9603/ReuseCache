@@ -10,6 +10,12 @@ public:
     BLOCK **tag_array;
     BLOCK **data_array;
 
+    uint64_t sim_llc_access[NUM_CPUS][NUM_TYPES],
+        sim_llc_tag_miss[NUM_CPUS][NUM_TYPES],
+        sim_llc_tag_hit[NUM_CPUS][NUM_TYPES],
+        sim_llc_data_miss[NUM_CPUS][NUM_TYPES],
+        sim_llc_data_hit[NUM_CPUS][NUM_TYPES];
+
     REUSE_CACHE_LLC(string name, uint32_t num_tag_array_ways, uint32_t num_tag_array_sets, uint32_t num_data_array_ways, uint32_t num_data_array_sets, uint32_t wq_size, uint32_t rq_size, uint32_t pq_size, uint32_t mshr_size)
         : CACHE(name, 0, 0, 0, wq_size, rq_size, pq_size, mshr_size), NUM_TAG_ARRAY_WAYS(num_tag_array_ways), NUM_TAG_ARRAY_SETS(num_tag_array_sets), NUM_DATA_ARRAY_WAYS(num_data_array_ways), NUM_DATA_ARRAY_SETS(num_data_array_sets)
     {
@@ -23,6 +29,18 @@ public:
         for (uint32_t i = 0; i < NUM_DATA_ARRAY_SETS; i++)
         {
             data_array[i] = new BLOCK[NUM_DATA_ARRAY_WAYS];
+        }
+
+        for (uint32_t i = 0; i < NUM_CPUS; i++)
+        {
+            for (uint32_t j = 0; j < NUM_TYPES; j++)
+            {
+                sim_llc_access[i][j] = 0;
+                sim_llc_tag_miss[i][j] = 0;
+                sim_llc_tag_hit[i][j] = 0;
+                sim_llc_data_miss[i][j] = 0;
+                sim_llc_data_hit[i][j] = 0;
+            }
         }
     }
 
