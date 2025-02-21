@@ -69,7 +69,7 @@ void REUSE_CACHE_LLC::handle_writeback()
             {
                 tag_array[tag_array_set][tag_way].nrr = 0;
                 tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
-                tag_array[tag_array_set][tag_way].forward_backward_pointer->nru = 0;
+                tag_array[tag_array_set][tag_way].forward_backward_pointer->nru = 1;
                 filled = 1;
             }
             else

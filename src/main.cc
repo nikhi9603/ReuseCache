@@ -1399,11 +1399,13 @@ int main(int argc, char **argv)
         uncore.LLC->upper_level_dcache[i] = &ooo_cpu[i].L2C;
         uncore.LLC->lower_level = &uncore.DRAM;
 
-        uncore.LLC->initialize_replacement = static_cast<void (CACHE::*)()>(&REUSE_CACHE_LLC::reuse_cache_llc_initialize_replacement);
+        #ifndef USE_REUSE_CACHE_LLC
+        uncore.LLC->initialize_replacement = &CACHE::llc_initialize_replacement;
         uncore.LLC->update_replacement_state = &CACHE::llc_update_replacement_state;
         uncore.LLC->find_victim = &CACHE::llc_find_victim;
         uncore.LLC->replacement_final_stats = &CACHE::llc_replacement_final_stats;
         (uncore.LLC->*(uncore.LLC->initialize_replacement))();
+        #endif
 
         // OFF-CHIP DRAM
         uncore.DRAM.fill_level = FILL_DRAM;

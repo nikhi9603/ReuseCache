@@ -32,6 +32,8 @@
 
 //#define PERFECT_BTB
 
+#define USE_REUSE_CACHE_LLC
+
 //Neelu: Perfect vs. Practical Perfect: 
 //Practical Perfect takes into account the bandwidth constraint between the current cache level and the outer cache hierarchy. What does this mean? 
 //Perfect marks requests as hits and avoids sending them to the rest of the memory hierarchy and so no fills will happen in the current cache level either. In this case, instruction requests at L2/LLC may get serviced earlier as data requests are not going to these caches. 
