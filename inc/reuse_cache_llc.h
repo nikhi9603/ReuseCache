@@ -53,7 +53,6 @@ public:
     // checks the tag array
     uint32_t get_set(uint64_t address);
 
-    void lru_update(uint32_t set, uint32_t way);
     int fill_cache_tag(uint32_t tag_array_set, PACKET *packet);
     int fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_way, PACKET *packet);
     int check_tag_hit(PACKET *packet);
@@ -64,9 +63,7 @@ public:
     void handle_writeback();
     void handle_read();
 
-    void reuse_cache_llc_initialize_replacement(),
-        reuse_cache_llc_update_replacement_state(uint32_t cpu, uint32_t set, uint32_t way, uint64_t full_addr, uint64_t ip, uint64_t victim_addr, uint32_t type, uint8_t hit),
-        reuse_cache_llc_replacement_final_stats();
+    void reuse_cache_llc_replacement_final_stats();
 
     uint32_t reuse_cache_llc_find_tag_array_victim(uint32_t tag_array_set),
         reuse_cache_llc_find_data_array_victim(uint32_t data_array_set);

@@ -9,7 +9,7 @@ inc = inc
 debug = 1
 
 CFlags = -Wall -g -std=c++11 -O3 -fno-stack-protector
-LDFlags = -static
+LDFlags = 
 libs =
 libDir =
 

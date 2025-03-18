@@ -123,6 +123,188 @@ void REUSE_CACHE_LLC::handle_writeback()
     }
 }
 
+void REUSE_CACHE_LLC::handle_read()
+{
+    if (RQ.occupancy == 0)
+        return;
+
+    for (uint32_t i = 0; i < MAX_READ; i++)
+    {
+        uint32_t read_cpu = RQ.entry[RQ.head].cpu;
+        if (read_cpu == NUM_CPUS)
+            return;
+
+        if ((RQ.entry[RQ.head].event_cycle <= current_core_cycle[read_cpu]) && (RQ.occupancy > 0))
+        {
+            uint32_t index = RQ.head;
+
+            uint32_t set = get_set(RQ.entry[index].address);
+            int way = check_hit(&RQ.entry[RQ.head]);
+
+            if (way >= 0)
+            {
+                tag_array[set][way].used = 1;
+                tag_array[set][way].nrr = 0;
+                tag_array[set][way].forward_backward_pointer->nru = 0;
+
+                if (RQ.entry[index].fill_level < fill_level)
+                {
+                    if (RQ.entry[index].instruction)
+                    {
+                        RQ.entry[index].data = tag_array[set][way].forward_backward_pointer->data;
+                        upper_level_icache[read_cpu]->return_data(&RQ.entry[index]);
+                    }
+                    else
+                    {
+                        RQ.entry[index].data = tag_array[set][way].forward_backward_pointer->data;
+                        upper_level_dcache[read_cpu]->return_data(&RQ.entry[index]);
+                    }
+                }
+
+                RQ.remove_queue(&RQ.entry[index]);
+                reads_available_this_cycle--;
+            }
+            else
+            {
+                uint8_t miss_handled = 1;
+                int mshr_index = check_nonfifo_queue(&MSHR, &RQ.entry[index], false);
+
+                if (mshr_index == -2)
+                {
+                    // this is a data/instruction collision in the MSHR, so we have to wait before we can allocate this miss
+                    miss_handled = 0;
+                }
+
+                if ((mshr_index == -1) && (MSHR.occupancy < MSHR_SIZE))
+                {
+                    if (lower_level->get_occupancy(1, RQ.entry[index].address) == lower_level->get_size(1, RQ.entry[index].address))
+                    {
+                        miss_handled = 0;
+                    }
+                    else
+                    {
+                        add_nonfifo_queue(&MSHR, &RQ.entry[index]); //@Vishal: Updated from add_mshr
+                        if (lower_level)
+                        {
+                            lower_level->add_rq(&RQ.entry[index]);
+                        }
+                    }
+                }
+                else
+                {
+                    if ((mshr_index == -1 && MSHR.occupancy == MSHR_SIZE))
+                    {
+                        STALL[RQ.entry[index].type]++;
+                        miss_handled = 0;
+                    }
+                    else if (mshr_index == -1)
+                    {
+                        if (RQ.entry[index].type == RFO)
+                        {
+
+                            if (RQ.entry[index].tlb_access)
+                            {
+                                // checking for dead code
+                                assert(0);
+                                uint32_t sq_index = RQ.entry[index].sq_index;
+                                MSHR.entry[mshr_index].store_merged = 1;
+                                MSHR.entry[mshr_index].sq_index_depend_on_me.insert(sq_index);
+                                MSHR.entry[mshr_index].sq_index_depend_on_me.join(RQ.entry[index].sq_index_depend_on_me, SQ_SIZE);
+                            }
+
+                            if (RQ.entry[index].load_merged)
+                            {
+                                // uint32_t lq_index = RQ.entry[index].lq_index;
+                                MSHR.entry[mshr_index].load_merged = 1;
+                                // MSHR.entry[mshr_index].lq_index_depend_on_me[lq_index] = 1;
+                                MSHR.entry[mshr_index].lq_index_depend_on_me.join(RQ.entry[index].lq_index_depend_on_me, LQ_SIZE);
+                            }
+                        }
+                        else
+                        {
+                            if (RQ.entry[index].instruction)
+                            {
+                                uint32_t rob_index = RQ.entry[index].rob_index;
+                                DP(if (warmup_complete[MSHR.entry[mshr_index].cpu]) {
+                                            //if(cache_type==IS_ITLB || cache_type==IS_DTLB || cache_type==IS_STLB)
+                                            cout << "read request merged with MSHR entry -"<< MSHR.entry[mshr_index].type << endl; });
+                                MSHR.entry[mshr_index].instr_merged = 1;
+                                MSHR.entry[mshr_index].rob_index_depend_on_me.insert(rob_index);
+
+                                DP(if (warmup_complete[MSHR.entry[mshr_index].cpu]) {
+                                            cout << "[INSTR_MERGED] " << __func__ << " cpu: " << MSHR.entry[mshr_index].cpu << " instr_id: " << MSHR.entry[mshr_index].instr_id;
+                                            cout << " merged rob_index: " << rob_index << " instr_id: " << RQ.entry[index].instr_id << endl; });
+
+                                if (RQ.entry[index].instr_merged)
+                                {
+                                    MSHR.entry[mshr_index].rob_index_depend_on_me.join(RQ.entry[index].rob_index_depend_on_me, ROB_SIZE);
+                                    DP(if (warmup_complete[MSHR.entry[mshr_index].cpu]) {
+                                                cout << "[INSTR_MERGED] " << __func__ << " cpu: " << MSHR.entry[mshr_index].cpu << " instr_id: " << MSHR.entry[mshr_index].instr_id;
+                                                cout << " merged rob_index: " << i << " instr_id: N/A" << endl; });
+                                }
+                            }
+                            else
+                            {
+                                uint32_t lq_index = RQ.entry[index].lq_index;
+                                MSHR.entry[mshr_index].load_merged = 1;
+                                MSHR.entry[mshr_index].lq_index_depend_on_me.insert(lq_index);
+
+                                DP(if (warmup_complete[read_cpu]) {
+                                            cout << "[DATA_MERGED] " << __func__ << " cpu: " << read_cpu << " instr_id: " << RQ.entry[index].instr_id;
+                                            cout << " merged rob_index: " << RQ.entry[index].rob_index << " instr_id: " << RQ.entry[index].instr_id << " lq_index: " << RQ.entry[index].lq_index << endl; });
+                                MSHR.entry[mshr_index].lq_index_depend_on_me.join(RQ.entry[index].lq_index_depend_on_me, LQ_SIZE);
+                                if (RQ.entry[index].store_merged)
+                                {
+                                    MSHR.entry[mshr_index].store_merged = 1;
+                                    MSHR.entry[mshr_index].sq_index_depend_on_me.join(RQ.entry[index].sq_index_depend_on_me, SQ_SIZE);
+                                }
+                            }
+                        }
+
+                        if (RQ.entry[index].fill_level < MSHR.entry[mshr_index].fill_level)
+                        {
+                            MSHR.entry[mshr_index].fill_level = RQ.entry[index].fill_level;
+                            MSHR.entry[mshr_index].instruction = RQ.entry[index].instruction;
+                        }
+
+                        if ((RQ.entry[index].fill_l1i) && (MSHR.entry[mshr_index].fill_l1i != 1))
+                        {
+                            MSHR.entry[mshr_index].fill_l1i = 1;
+                        }
+                        if ((RQ.entry[index].fill_l1d) && (MSHR.entry[mshr_index].fill_l1d != 1))
+                        {
+                            MSHR.entry[mshr_index].fill_l1d = 1;
+                        }
+
+                        MSHR_MERGED[RQ.entry[index].type]++;
+                    }
+                    else
+                    {
+                        cerr << "[" << NAME << "] MSHR errors" << endl;
+                        assert(0);
+                    }
+                }
+
+                if (miss_handled)
+                {
+                    RQ.remove_queue(&RQ.entry[index]);
+                    reads_available_this_cycle--;
+                }
+            }
+        }
+        else
+            return;
+
+        if (reads_available_this_cycle == 0)
+            return;
+    }
+}
+
+void REUSE_CACHE_LLC::reuse_cache_llc_replacement_final_stats()
+{
+    std::cout << "REUSE_CACHE_LLC_REPLACEMENT_FINAL_STATS" << std::endl;
+}
+
 uint32_t REUSE_CACHE_LLC::get_set(uint64_t address)
 {
     return (uint32_t)(address & ((1 << lg2(NUM_TAG_ARRAY_SETS)) - 1));
@@ -151,6 +333,23 @@ int REUSE_CACHE_LLC::check_hit(PACKET *packet)
     {
         if (tag_array[set][i].valid && tag_array[set][i].tag == packet->address && tag_array[set][i].hasData)
         {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int REUSE_CACHE_LLC::invalidate_entry(uint64_t inval_addr)
+{
+    uint32_t set = get_set(inval_addr);
+
+    for (uint32_t i = 0; i < NUM_TAG_ARRAY_WAYS; i++)
+    {
+        if (tag_array[set][i].valid && tag_array[set][i].tag == inval_addr)
+        {
+            tag_array[set][i].valid = 0;
+            tag_array[set][i].hasData = false;
             return 1;
         }
     }
