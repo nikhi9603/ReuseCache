@@ -1861,7 +1861,13 @@ int main(int argc, char **argv)
         print_roi_stats(i, &ooo_cpu[i].PTW.PSCL3);
         print_roi_stats(i, &ooo_cpu[i].PTW.PSCL2);
 #endif
+
+#ifdef USE_REUSE_CACHE_LLC
+        (uncore.LLC->*uncore.LLC->replacement_final_stats)();
+
+#else
         print_roi_stats(i, uncore.LLC);
+#endif
 
         //@Vishal: print stats
         cout << endl;

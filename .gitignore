@@ -6,3 +6,4 @@
 *.gz
 bin/*
 obj/*
+traces/

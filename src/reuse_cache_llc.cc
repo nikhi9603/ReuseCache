@@ -19,12 +19,14 @@ void REUSE_CACHE_LLC::handle_fill()
         if (tag_way != NUM_TAG_ARRAY_WAYS)
         { // tag already present, but data not present
             filled = fill_cache_data(tag_array_set, tag_way, &MSHR.entry[mshr_index]);
-            sim_llc_tag_hit[fill_cpu][MSHR.entry[mshr_index].type]++;
+            if (filled)
+                sim_llc_tag_hit[fill_cpu][MSHR.entry[mshr_index].type]++;
         }
         else
         { // tag not present
             filled = fill_cache_tag(tag_array_set, &MSHR.entry[mshr_index]);
-            sim_llc_tag_miss[fill_cpu][MSHR.entry[mshr_index].type]++;
+            if (filled)
+                sim_llc_tag_miss[fill_cpu][MSHR.entry[mshr_index].type]++;
         }
 
         if (filled)
@@ -39,6 +41,8 @@ void REUSE_CACHE_LLC::handle_fill()
 
             MSHR.remove_queue(&MSHR.entry[mshr_index]);
             MSHR.num_returned--;
+
+            sim_llc_access[fill_cpu][MSHR.entry[mshr_index].type]++;
 
             update_fill_cycle();
         }
@@ -63,30 +67,34 @@ void REUSE_CACHE_LLC::handle_writeback()
 
         int filled = 0;
 
-        if (tag_way != NUM_TAG_ARRAY_WAYS)
+        if (tag_way != NUM_TAG_ARRAY_WAYS) // tag hit
         {
-            if (tag_array[tag_array_set][tag_way].hasData)
+            if (tag_array[tag_array_set][tag_way].hasData) // data hit
             {
                 tag_array[tag_array_set][tag_way].nrr = 0;
                 tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
                 tag_array[tag_array_set][tag_way].forward_backward_pointer->nru = 1;
                 filled = 1;
             }
-            else
+            else // data miss
             {
                 filled = fill_cache_data(tag_array_set, tag_way, &WQ.entry[index]);
 
                 if (filled)
+                {
                     tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
+                }
             }
+
+            if (filled)
+                sim_llc_tag_hit[writeback_cpu][WQ.entry[index].type]++;
         }
-        else
+        else // tag miss
         {
             if (lower_level)
             {
                 if (lower_level->get_occupancy(2, WQ.entry[index].address) == lower_level->get_size(2, WQ.entry[index].address))
                 {
-
                     // lower level WQ is full, cannot replace this victim
                     filled = 0;
                     lower_level->increment_WQ_FULL(WQ.entry[index].address);
@@ -114,10 +122,14 @@ void REUSE_CACHE_LLC::handle_writeback()
 
             if (filled)
                 filled &= fill_cache_tag(tag_array_set, &WQ.entry[index]);
+
+            if (filled)
+                sim_llc_tag_miss[writeback_cpu][WQ.entry[index].type]++;
         }
 
         if (filled)
         {
+            sim_llc_access[writeback_cpu][WQ.entry[index].type]++;
             WQ.remove_queue(&WQ.entry[index]);
         }
     }
@@ -138,31 +150,36 @@ void REUSE_CACHE_LLC::handle_read()
         {
             uint32_t index = RQ.head;
 
-            uint32_t set = get_set(RQ.entry[index].address);
+            uint32_t tag_array_set = get_set(RQ.entry[index].address);
+            int tag_way = check_tag_hit(&RQ.entry[index]);
             int way = check_hit(&RQ.entry[RQ.head]);
 
             if (way >= 0)
             {
-                tag_array[set][way].used = 1;
-                tag_array[set][way].nrr = 0;
-                tag_array[set][way].forward_backward_pointer->nru = 0;
+                tag_array[tag_array_set][way].used = 1;
+                tag_array[tag_array_set][way].nrr = 0;
+                tag_array[tag_array_set][way].forward_backward_pointer->nru = 0;
 
                 if (RQ.entry[index].fill_level < fill_level)
                 {
                     if (RQ.entry[index].instruction)
                     {
-                        RQ.entry[index].data = tag_array[set][way].forward_backward_pointer->data;
+                        RQ.entry[index].data = tag_array[tag_array_set][way].forward_backward_pointer->data;
                         upper_level_icache[read_cpu]->return_data(&RQ.entry[index]);
                     }
                     else
                     {
-                        RQ.entry[index].data = tag_array[set][way].forward_backward_pointer->data;
+                        RQ.entry[index].data = tag_array[tag_array_set][way].forward_backward_pointer->data;
                         upper_level_dcache[read_cpu]->return_data(&RQ.entry[index]);
                     }
                 }
 
                 RQ.remove_queue(&RQ.entry[index]);
                 reads_available_this_cycle--;
+
+                sim_llc_access[read_cpu][RQ.entry[index].type]++;
+                sim_llc_tag_hit[read_cpu][RQ.entry[index].type]++;
+                sim_llc_data_hit[read_cpu][RQ.entry[index].type]++;
             }
             else
             {
@@ -287,6 +304,14 @@ void REUSE_CACHE_LLC::handle_read()
 
                 if (miss_handled)
                 {
+                    // sim_llc_access[read_cpu][RQ.entry[index].type]++;
+                    if (tag_way != NUM_TAG_ARRAY_WAYS)
+                    {
+                        // sim_llc_tag_hit[read_cpu][RQ.entry[index].type]++;
+                        sim_llc_data_miss[read_cpu][RQ.entry[index].type]++;
+                    }
+                    // else
+                    //     sim_llc_tag_miss[read_cpu][RQ.entry[index].type]++;
                     RQ.remove_queue(&RQ.entry[index]);
                     reads_available_this_cycle--;
                 }
@@ -302,7 +327,28 @@ void REUSE_CACHE_LLC::handle_read()
 
 void REUSE_CACHE_LLC::reuse_cache_llc_replacement_final_stats()
 {
-    std::cout << "REUSE_CACHE_LLC_REPLACEMENT_FINAL_STATS" << std::endl;
+    std::cout << "REUSE CACHE LLC REPLACEMENT FINAL STATS" << std::endl;
+
+    for (uint32_t i = 0; i < NUM_CPUS; i++)
+    {
+        std::cout << "CPU: " << i << std::endl;
+        int TOTAL_ACCESS = 0, TOTAL_TAG_MISS = 0, TOTAL_TAG_HIT = 0, TOTAL_DATA_MISS = 0, TOTAL_DATA_HIT = 0;
+        for (uint32_t j = 0; j < NUM_TYPES; j++)
+        {
+            TOTAL_ACCESS += sim_llc_access[i][j];
+            TOTAL_TAG_MISS += sim_llc_tag_miss[i][j];
+            TOTAL_TAG_HIT += sim_llc_tag_hit[i][j];
+            TOTAL_DATA_MISS += sim_llc_data_miss[i][j];
+            TOTAL_DATA_HIT += sim_llc_data_hit[i][j];
+        }
+        int TOTAL_MISS = TOTAL_TAG_MISS + TOTAL_DATA_MISS;
+        std::cout << "TOTAL ACCESS: " << TOTAL_ACCESS << " TOTAL MISS: " << TOTAL_MISS << " TOTAL HIT: " << TOTAL_DATA_HIT << std::endl;
+        std::cout << "TAG MISS: " << TOTAL_TAG_MISS << " TAG HIT: " << TOTAL_TAG_HIT << std::endl;
+        std::cout << "DATA MISS: " << TOTAL_DATA_MISS << " DATA HIT: " << TOTAL_DATA_HIT << std::endl;
+        std::cout << "TAG_HIT: " << TOTAL_TAG_HIT << " DATA_HIT: " << TOTAL_DATA_HIT << std::endl;
+        std::cout << "MISS_RATE: " << (double)TOTAL_MISS / TOTAL_ACCESS << std::endl;
+        std::cout << "HIT_RATE: " << (double)TOTAL_DATA_HIT / TOTAL_ACCESS << std::endl;
+    }
 }
 
 uint32_t REUSE_CACHE_LLC::get_set(uint64_t address)
@@ -397,7 +443,7 @@ int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
     }
 
     tag_array[tag_array_set][tag_victim].valid = 1;
-    tag_array[tag_victim][tag_array_set].dirty = 0;
+    tag_array[tag_array_set][tag_victim].dirty = 0;
     tag_array[tag_array_set][tag_victim].used = 0;
     tag_array[tag_array_set][tag_victim].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
 
@@ -458,7 +504,7 @@ int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_
 
     data_array[data_array_set][data_array_way].valid = 1;
     data_array[data_array_set][data_array_way].dirty = 0;
-    data_array[data_array_way][data_array_set].used = 0;
+    data_array[data_array_set][data_array_way].used = 0;
     data_array[data_array_set][data_array_way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
 
     data_array[data_array_set][data_array_way].tag = packet->address;
