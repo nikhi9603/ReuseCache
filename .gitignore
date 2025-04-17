@@ -4,6 +4,5 @@
 *.log
 *.trace
 *.gz
-bin/*
 obj/*
 traces/
