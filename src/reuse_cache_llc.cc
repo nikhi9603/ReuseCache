@@ -44,6 +44,9 @@ void REUSE_CACHE_LLC::handle_fill()
 
             sim_llc_access[fill_cpu][MSHR.entry[mshr_index].type]++;
 
+            ACCESS[MSHR.entry[mshr_index].type]++;
+            MISS[MSHR.entry[mshr_index].type]++;
+
             update_fill_cycle();
         }
     }
@@ -130,6 +133,13 @@ void REUSE_CACHE_LLC::handle_writeback()
         if (filled)
         {
             sim_llc_access[writeback_cpu][WQ.entry[index].type]++;
+
+            ACCESS[WQ.entry[index].type]++;
+            if (tag_way != NUM_TAG_ARRAY_WAYS)
+                HIT[WQ.entry[index].type]++;
+            else
+                MISS[WQ.entry[index].type]++;
+
             WQ.remove_queue(&WQ.entry[index]);
         }
     }
@@ -180,6 +190,9 @@ void REUSE_CACHE_LLC::handle_read()
                 sim_llc_access[read_cpu][RQ.entry[index].type]++;
                 sim_llc_tag_hit[read_cpu][RQ.entry[index].type]++;
                 sim_llc_data_hit[read_cpu][RQ.entry[index].type]++;
+
+                ACCESS[RQ.entry[index].type]++;
+                HIT[RQ.entry[index].type]++;
             }
             else
             {
@@ -333,21 +346,23 @@ void REUSE_CACHE_LLC::reuse_cache_llc_replacement_final_stats()
     {
         std::cout << "CPU: " << i << std::endl;
         int TOTAL_ACCESS = 0, TOTAL_TAG_MISS = 0, TOTAL_TAG_HIT = 0, TOTAL_DATA_MISS = 0, TOTAL_DATA_HIT = 0;
+        int TOTAL_MISS = 0, TOTAL_HIT = 0;
         for (uint32_t j = 0; j < NUM_TYPES; j++)
         {
-            TOTAL_ACCESS += sim_llc_access[i][j];
+            TOTAL_ACCESS += ACCESS[j];
+            TOTAL_MISS += MISS[j];
+            TOTAL_HIT += HIT[j];
             TOTAL_TAG_MISS += sim_llc_tag_miss[i][j];
             TOTAL_TAG_HIT += sim_llc_tag_hit[i][j];
             TOTAL_DATA_MISS += sim_llc_data_miss[i][j];
             TOTAL_DATA_HIT += sim_llc_data_hit[i][j];
         }
-        int TOTAL_MISS = TOTAL_TAG_MISS + TOTAL_DATA_MISS;
-        std::cout << "TOTAL ACCESS: " << TOTAL_ACCESS << " TOTAL MISS: " << TOTAL_MISS << " TOTAL HIT: " << TOTAL_DATA_HIT << std::endl;
+        std::cout << "TOTAL ACCESS: " << TOTAL_ACCESS << " TOTAL MISS: " << TOTAL_MISS << " TOTAL HIT: " << TOTAL_HIT << std::endl;
         std::cout << "TAG MISS: " << TOTAL_TAG_MISS << " TAG HIT: " << TOTAL_TAG_HIT << std::endl;
         std::cout << "DATA MISS: " << TOTAL_DATA_MISS << " DATA HIT: " << TOTAL_DATA_HIT << std::endl;
         std::cout << "TAG_HIT: " << TOTAL_TAG_HIT << " DATA_HIT: " << TOTAL_DATA_HIT << std::endl;
         std::cout << "MISS_RATE: " << (double)TOTAL_MISS / TOTAL_ACCESS << std::endl;
-        std::cout << "HIT_RATE: " << (double)TOTAL_DATA_HIT / TOTAL_ACCESS << std::endl;
+        std::cout << "HIT_RATE: " << (double)TOTAL_HIT / TOTAL_ACCESS << std::endl;
     }
 }
 
