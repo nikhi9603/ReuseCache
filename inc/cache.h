@@ -72,7 +72,7 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define STLB_LATENCY 8
 
 // L1 INSTRUCTION CACHE
-#define L1I_SET 8192
+#define L1I_SET 128
 #define L1I_WAY 4
 #define L1I_RQ_SIZE 64
 #define L1I_WQ_SIZE 64
@@ -81,7 +81,7 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define L1I_LATENCY 1
 
 // L1 DATA CACHE
-#define L1D_SET 8192
+#define L1D_SET 128
 #define L1D_WAY 4
 #define L1D_RQ_SIZE 64
 #define L1D_WQ_SIZE 64
@@ -90,7 +90,7 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define L1D_LATENCY 1
 
 // L2 CACHE
-#define L2C_SET 32768
+#define L2C_SET 512
 #define L2C_WAY 8
 #define L2C_RQ_SIZE 32
 #define L2C_WQ_SIZE 32

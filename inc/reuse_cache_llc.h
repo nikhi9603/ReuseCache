@@ -48,6 +48,13 @@ public:
                 sim_llc_data_hit[i][j] = 0;
             }
         }
+
+        for (uint32_t j = 0; j < NUM_TYPES; j++)
+        {
+            ACCESS[j] = 0;
+            MISS[j] = 0;
+            HIT[j] = 0;
+        }
     }
 
     // checks the tag array
