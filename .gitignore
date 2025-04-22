@@ -4,8 +4,8 @@
 *.log
 *.trace
 *.gz
-obj/*
+ReuseCache/obj/*
 traces/
 speccpu-traces/
-bin/*
-reuse_cache_output/*
+ReuseCache/bin/*
+ReuseCache/reuse_cache_output/*

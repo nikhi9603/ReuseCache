@@ -33,7 +33,7 @@ run_simulation() {
 }
 
 # Loop and run simulations in parallel
-for TRACE in traces/*.xz; do
+for TRACE in ../traces/*.xz; do
     run_simulation "$TRACE" &
     ((job_count++))
 
