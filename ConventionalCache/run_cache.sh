@@ -11,19 +11,16 @@ PROGRAM=bin/champsim
 mkdir -p cache_output
 
 # Set how many jobs you want to run in parallel
-NUM_JOBS=$(nproc)  # or set manually, e.g., NUM_JOBS=8
+NUM_JOBS=4
 job_count=0
 
 # Function to run the simulation
 run_simulation() {
     local TRACE="$1"
     local BASENAME=$(basename "$TRACE")
-    local NUMBER=$(echo "$BASENAME" | sed -n 's/.*-\([0-9]\+\)B\..*/\1/p')
-    
-    local BILLION=1000000000
-    local MILLION=1000000
-    local SIMULATION=$(echo "$NUMBER * $BILLION" | bc)
-    local WARMUP=$(echo "$NUMBER * $MILLION" | bc)
+
+    local SIMULATION=2000000000
+    local WARMUP=50000000
     
     local OUTPUT_FILE="cache_output/${BASENAME%.xz}.out"
 
