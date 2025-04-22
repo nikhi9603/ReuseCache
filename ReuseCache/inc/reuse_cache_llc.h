@@ -3,6 +3,8 @@
 
 #include "cache.h"
 
+#include <map>
+
 // REUSE CACHE PARAMETERS
 #define REUSE_CACHE_TAG_ARRAY_SET 4096
 #define REUSE_CACHE_TAG_ARRAY_WAYS 16
@@ -21,6 +23,8 @@ public:
         sim_llc_tag_hit[NUM_CPUS][NUM_TYPES],
         sim_llc_data_miss[NUM_CPUS][NUM_TYPES],
         sim_llc_data_hit[NUM_CPUS][NUM_TYPES];
+
+    map<uint64_t, uint32_t> num_uses_before_eviction;
 
     REUSE_CACHE_LLC(string name, uint32_t num_tag_array_ways, uint32_t num_tag_array_sets, uint32_t num_data_array_ways, uint32_t num_data_array_sets, uint32_t wq_size, uint32_t rq_size, uint32_t pq_size, uint32_t mshr_size)
         : CACHE(name, 0, 0, 0, wq_size, rq_size, pq_size, mshr_size), NUM_TAG_ARRAY_WAYS(num_tag_array_ways), NUM_TAG_ARRAY_SETS(num_tag_array_sets), NUM_DATA_ARRAY_WAYS(num_data_array_ways), NUM_DATA_ARRAY_SETS(num_data_array_sets)

@@ -193,6 +193,7 @@ void REUSE_CACHE_LLC::handle_read()
 
                 ACCESS[RQ.entry[index].type]++;
                 HIT[RQ.entry[index].type]++;
+                tag_array[tag_array_set][way].forward_backward_pointer->num_uses++;
             }
             else
             {
@@ -363,6 +364,15 @@ void REUSE_CACHE_LLC::reuse_cache_llc_replacement_final_stats()
         std::cout << "TAG_HIT: " << TOTAL_TAG_HIT << " DATA_HIT: " << TOTAL_DATA_HIT << std::endl;
         std::cout << "MISS_RATE: " << (double)TOTAL_MISS / TOTAL_ACCESS << std::endl;
         std::cout << "HIT_RATE: " << (double)TOTAL_HIT / TOTAL_ACCESS << std::endl;
+
+        std::cout << "In Reuse Cache:" << std::endl;
+        int totalLines = 0;
+        for (auto &use : num_uses_before_eviction)
+        {
+            totalLines += use.second;
+            std::cout << use.second << " lines used " << use.first << " times before eviction" << std::endl;
+        }
+        std::cout << "Total lines: " << totalLines << std::endl;
     }
 }
 
@@ -540,6 +550,7 @@ int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_
 
     tag_array[tag_array_set][tag_array_way].nrr = 0;
     data_array[data_array_set][data_array_way].nru = 1;
+    data_array[data_array_set][data_array_way].num_uses = 0;
 
     return 1;
 }
@@ -577,6 +588,7 @@ uint32_t REUSE_CACHE_LLC::reuse_cache_llc_find_data_array_victim(uint32_t data_a
     {
         if (data_array[data_array_set][i].nru == 1)
         {
+            num_uses_before_eviction[data_array[data_array_set][i].num_uses]++;
             return i;
         }
     }

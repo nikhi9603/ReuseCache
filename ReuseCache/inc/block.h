@@ -32,11 +32,12 @@ public:
 
     // replacement state
     uint32_t lru;
+    int num_uses;
 
     // used only in case of Reuse Cache LLC
-    bool hasData; // only for tag array
-    bool nrr; // only for tag array
-    bool nru; // only for data array
+    bool hasData;                    // only for tag array
+    bool nrr;                        // only for tag array
+    bool nru;                        // only for data array
     BLOCK *forward_backward_pointer; // forward pointer to data array in case of tag array
                                      // backward pointer to tag array in case of data array
 
@@ -64,6 +65,7 @@ public:
         instr_id = 0;
 
         lru = 0;
+        num_uses = 0;
 
         hasData = false;
         nrr = -1;
