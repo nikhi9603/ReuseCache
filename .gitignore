@@ -6,3 +6,6 @@
 *.gz
 obj/*
 traces/
+speccpu-traces/
+bin/*
+reuse_cache_output/*
