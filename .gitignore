@@ -5,7 +5,10 @@
 *.trace
 *.gz
 ReuseCache/obj/*
+ConventionalCache/obj/*
 traces/
 speccpu-traces/
 ReuseCache/bin/*
+ConventionalCache/bin/*
 ReuseCache/reuse_cache_output/*
+ConventionalCache/cache_output/*
