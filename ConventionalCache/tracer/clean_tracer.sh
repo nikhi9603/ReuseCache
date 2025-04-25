@@ -1,2 +1,2 @@
-export PIN_ROOT=/home/grads/c/cienlux/task/pin-3.2-81205-gcc-linux
+export PIN_ROOT=/~/BTP/pin-3.22-98547-g7a303a835-gcc-linux
 make clean

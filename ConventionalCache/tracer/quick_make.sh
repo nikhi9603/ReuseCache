@@ -1,1 +1,1 @@
-make PIN_ROOT=/home/grads/c/cienlux/cienlux/task/pin-3.0-76991-gcc-linux obj-intel64/champsim_tracer.so
+make PIN_ROOT=~/BTP/pin-3.22-98547-g7a303a835-gcc-linux obj-intel64/champsim_tracer.so

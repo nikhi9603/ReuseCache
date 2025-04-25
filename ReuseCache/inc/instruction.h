@@ -42,12 +42,6 @@ public:
     uint64_t destination_memory[NUM_INSTR_DESTINATIONS]; // output memory
     uint64_t source_memory[NUM_INSTR_SOURCES];           // input memory
 
-    uint destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
-    uint source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
-
-    unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS]; // output memory values
-    unsigned char *source_memory_value[NUM_INSTR_SOURCES];           // input memory values
-
     input_instr()
     {
         ip = 0;
@@ -58,41 +52,14 @@ public:
         {
             source_registers[i] = 0;
             source_memory[i] = 0;
-            source_memory_size[i] = 0;
-            source_memory_value[i] = nullptr;
         }
 
         for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS; i++)
         {
             destination_registers[i] = 0;
             destination_memory[i] = 0;
-            destination_memory_size[i] = 0;
-            destination_memory_value[i] = nullptr;
         }
-    }
-
-    static size_t get_basic_size()
-    {
-        return sizeof(ip) + sizeof(is_branch) + sizeof(branch_taken) +
-               sizeof(destination_registers) + sizeof(source_registers) +
-               sizeof(destination_memory) + sizeof(source_memory) +
-               sizeof(destination_memory_size) + sizeof(source_memory_size);
-    }
-
-    size_t get_size()
-    {
-        size_t size = get_basic_size();
-
-        for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-        {
-            size += destination_memory_size[i];
-        }
-
-        for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++)
-        {
-            size += source_memory_size[i];
-        }
-    }
+    };
 };
 
 class cloudsuite_instr

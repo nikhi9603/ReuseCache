@@ -58,7 +58,7 @@ void O3_CPU::read_from_trace()
     while (continue_reading)
     {
 
-        size_t instr_size = knob_cloudsuite ? sizeof(cloudsuite_instr) : input_instr::get_basic_size();
+        size_t instr_size = knob_cloudsuite ? sizeof(cloudsuite_instr) : sizeof(input_instr);
 
         if (knob_cloudsuite)
         {
@@ -221,8 +221,6 @@ void O3_CPU::read_from_trace()
                 break;
             }
             input_instr trace_read_instr;
-            size_t instr_size = trace_read_instr.get_size();
-
             if (!fread(&trace_read_instr, instr_size, 1, trace_file))
             {
                 // reached end of file for this trace
@@ -240,27 +238,6 @@ void O3_CPU::read_from_trace()
             }
             else
             { // successfully read the trace
-                bool hasMemOperands = ((trace_read_instr.is_branch & 0b00000010) == 2);
-                if (hasMemOperands)
-                {
-                    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-                    {
-                        if (trace_read_instr.destination_memory_size[i] > 0)
-                        {
-                            trace_read_instr.destination_memory_value[i] = new unsigned char[trace_read_instr.destination_memory_size[i]];
-                            fread(trace_read_instr.destination_memory_value[i], trace_read_instr.destination_memory_size[i], 1, trace_file);
-                        }
-                    }
-
-                    for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-                    {
-                        if (trace_read_instr.source_memory_size[i] > 0)
-                        {
-                            trace_read_instr.source_memory_value[i] = new unsigned char[trace_read_instr.source_memory_size[i]];
-                            fread(trace_read_instr.source_memory_value[i], trace_read_instr.source_memory_size[i], 1, trace_file);
-                        }
-                    }
-                }
 
                 if (instr_unique_id == 0)
                 {
@@ -296,8 +273,6 @@ void O3_CPU::read_from_trace()
                 {
                     arch_instr.destination_registers[i] = current_instr.destination_registers[i];
                     arch_instr.destination_memory[i] = current_instr.destination_memory[i];
-                    arch_instr.destination_memory_size[i] = current_instr.destination_memory_size[i];
-                    arch_instr.destination_memory_value[i] = current_instr.destination_memory_value[i];
                     arch_instr.destination_virtual_address[i] = current_instr.destination_memory[i];
 
                     if (arch_instr.destination_registers[i] == reg_stack_pointer)
@@ -333,8 +308,6 @@ void O3_CPU::read_from_trace()
                 {
                     arch_instr.source_registers[i] = current_instr.source_registers[i];
                     arch_instr.source_memory[i] = current_instr.source_memory[i];
-                    arch_instr.source_memory_size[i] = current_instr.source_memory_size[i];
-                    arch_instr.source_memory_value[i] = current_instr.source_memory_value[i];
                     arch_instr.source_virtual_address[i] = current_instr.source_memory[i];
 
                     if (arch_instr.source_registers[i] == reg_stack_pointer)
