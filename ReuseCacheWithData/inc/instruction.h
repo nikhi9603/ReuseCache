@@ -42,8 +42,8 @@ public:
     uint64_t destination_memory[NUM_INSTR_DESTINATIONS]; // output memory
     uint64_t source_memory[NUM_INSTR_SOURCES];           // input memory
 
-    uint destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
-    uint source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
+    uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
+    uint8_t source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
 
     unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS]; // output memory values
     unsigned char *source_memory_value[NUM_INSTR_SOURCES];           // input memory values
@@ -74,9 +74,7 @@ public:
     static size_t get_basic_size()
     {
         return sizeof(ip) + sizeof(is_branch) + sizeof(branch_taken) +
-               sizeof(destination_registers) + sizeof(source_registers) +
-               sizeof(destination_memory) + sizeof(source_memory) +
-               sizeof(destination_memory_size) + sizeof(source_memory_size);
+               sizeof(destination_registers) + sizeof(source_registers);
     }
 
     size_t get_size()
@@ -202,8 +200,8 @@ public:
     uint64_t source_memory[NUM_INSTR_SOURCES];                 // input memory
     // int source_memory_outstanding[NUM_INSTR_SOURCES];  // a value of 2 here means the load hasn't been issued yet, 1 means it has been issued, but not returned yet, and 0 means it has returned
 
-    uint destination_memory_size[NUM_INSTR_DESTINATIONS_SPARC];
-    uint source_memory_size[NUM_INSTR_SOURCES];
+    uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS_SPARC];
+    uint8_t source_memory_size[NUM_INSTR_SOURCES];
 
     unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS_SPARC];
     unsigned char *source_memory_value[NUM_INSTR_SOURCES];

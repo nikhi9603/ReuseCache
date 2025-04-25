@@ -221,7 +221,6 @@ void O3_CPU::read_from_trace()
                 break;
             }
             input_instr trace_read_instr;
-            size_t instr_size = trace_read_instr.get_size();
 
             if (!fread(&trace_read_instr, instr_size, 1, trace_file))
             {
@@ -243,6 +242,12 @@ void O3_CPU::read_from_trace()
                 bool hasMemOperands = ((trace_read_instr.is_branch & 0b00000010) == 2);
                 if (hasMemOperands)
                 {
+                    // read the destination memory operands
+                    fread(&trace_read_instr.destination_memory, sizeof(uint64_t), NUM_INSTR_DESTINATIONS, trace_file);
+                    fread(&trace_read_instr.source_memory, sizeof(uint64_t), NUM_INSTR_SOURCES, trace_file);
+                    fread(&trace_read_instr.destination_memory_size, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, trace_file);
+                    fread(&trace_read_instr.source_memory_size, sizeof(uint8_t), NUM_INSTR_SOURCES, trace_file);
+
                     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
                     {
                         if (trace_read_instr.destination_memory_size[i] > 0)
