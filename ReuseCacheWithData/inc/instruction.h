@@ -92,6 +92,8 @@ public:
         {
             size += source_memory_size[i];
         }
+
+        return size;
     }
 };
 
