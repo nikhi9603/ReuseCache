@@ -13,3 +13,5 @@ ReuseCache/bin/*
 ConventionalCache/bin/*
 ReuseCache/reuse_cache_output/*
 ConventionalCache/cache_output/*
+ONNX-Runtime-Inference/build
+ONNX-Runtime-Inference/data/models
