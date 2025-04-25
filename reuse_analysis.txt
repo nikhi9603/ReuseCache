@@ -1,0 +1,299 @@
+Cache: ConventionalCache, Trace: 625.x264_s-39B
+IPC: 0.77
+HitRate: 54.463
+TotalLines: 1641334
+Lines with Zero Usage: 90721
+% Lines with Zero Usage: 5.53%
+% Lines with Single Usage: 7.58%
+
+Cache: ReuseCache, Trace: 625.x264_s-39B
+IPC: 0.76
+HitRate: 15.257000000000001
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 444.namd-23B
+IPC: 1.15
+HitRate: 51.1897
+TotalLines: 338419
+Lines with Zero Usage: 79011
+% Lines with Zero Usage: 23.35%
+% Lines with Single Usage: 22.02%
+
+Cache: ReuseCache, Trace: 444.namd-23B
+IPC: 1.15
+HitRate: 31.005
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 403.gcc-17B
+IPC: 0.36
+HitRate: 91.3918
+TotalLines: 3175838
+Lines with Zero Usage: 1494017
+% Lines with Zero Usage: 47.04%
+% Lines with Single Usage: 6.88%
+
+Cache: ReuseCache, Trace: 403.gcc-17B
+IPC: 0.28
+HitRate: 12.064400000000001
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 400.perlbench-50B
+IPC: 0.50
+HitRate: 62.3076
+TotalLines: 1006025
+Lines with Zero Usage: 237136
+% Lines with Zero Usage: 23.57%
+% Lines with Single Usage: 11.41%
+
+Cache: ReuseCache, Trace: 400.perlbench-50B
+IPC: 0.51
+HitRate: 69.7398
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 401.bzip2-7B
+IPC: 0.72
+HitRate: 98.9645
+TotalLines: 174325
+Lines with Zero Usage: 22837
+% Lines with Zero Usage: 13.10%
+% Lines with Single Usage: 0.85%
+
+Cache: ReuseCache, Trace: 401.bzip2-7B
+IPC: 0.73
+HitRate: 97.2816
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 625.x264_s-20B
+IPC: 0.77
+HitRate: 52.1947
+TotalLines: 1300706
+Lines with Zero Usage: 180133
+% Lines with Zero Usage: 13.85%
+% Lines with Single Usage: 10.64%
+
+Cache: ReuseCache, Trace: 625.x264_s-20B
+IPC: 0.76
+HitRate: 9.4214
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 458.sjeng-31B
+IPC: 0.53
+HitRate: 64.2545
+TotalLines: 583597
+Lines with Zero Usage: 374903
+% Lines with Zero Usage: 64.24%
+% Lines with Single Usage: 21.69%
+
+Cache: ReuseCache, Trace: 458.sjeng-31B
+IPC: 0.54
+HitRate: 43.0552
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 657.xz_s-56B
+IPC: 1.25
+HitRate: 0.0119251
+TotalLines: 793950
+Lines with Zero Usage: 793895
+% Lines with Zero Usage: 99.99%
+% Lines with Single Usage: 0.00%
+
+Cache: ReuseCache, Trace: 657.xz_s-56B
+IPC: 1.27
+HitRate: 0.010613299999999999
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 403.gcc-48B
+IPC: 0.70
+HitRate: 41.3959
+TotalLines: 1099149
+Lines with Zero Usage: 256043
+% Lines with Zero Usage: 23.29%
+% Lines with Single Usage: 16.85%
+
+Cache: ReuseCache, Trace: 403.gcc-48B
+IPC: 0.70
+HitRate: 11.078899999999999
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 444.namd-44B
+IPC: 1.01
+HitRate: 40.1405
+TotalLines: 31021
+Lines with Zero Usage: 29728
+% Lines with Zero Usage: 95.83%
+% Lines with Single Usage: 3.94%
+
+Cache: ReuseCache, Trace: 444.namd-44B
+IPC: 1.01
+HitRate: 35.134
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 625.x264_s-12B
+IPC: 1.17
+HitRate: 53.336
+TotalLines: 1097467
+Lines with Zero Usage: 144283
+% Lines with Zero Usage: 13.15%
+% Lines with Single Usage: 11.22%
+
+Cache: ReuseCache, Trace: 625.x264_s-12B
+IPC: 1.15
+HitRate: 7.21846
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 625.x264_s-18B
+IPC: 0.84
+HitRate: 52.0803
+TotalLines: 1651440
+Lines with Zero Usage: 201505
+% Lines with Zero Usage: 12.20%
+% Lines with Single Usage: 10.37%
+
+Cache: ReuseCache, Trace: 625.x264_s-18B
+IPC: 0.82
+HitRate: 4.9277500000000005
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 445.gobmk-30B
+IPC: 0.41
+HitRate: 81.7976
+TotalLines: 1192394
+Lines with Zero Usage: 571241
+% Lines with Zero Usage: 47.91%
+% Lines with Single Usage: 17.07%
+
+Cache: ReuseCache, Trace: 445.gobmk-30B
+IPC: 0.41
+HitRate: 72.1374
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 445.gobmk-17B
+IPC: 0.43
+HitRate: 61.6439
+TotalLines: 1711457
+Lines with Zero Usage: 505969
+% Lines with Zero Usage: 29.56%
+% Lines with Single Usage: 19.93%
+
+Cache: ReuseCache, Trace: 445.gobmk-17B
+IPC: 0.43
+HitRate: 47.5628
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 625.x264_s-33B
+IPC: 0.96
+HitRate: 50.6548
+TotalLines: 1373639
+Lines with Zero Usage: 178636
+% Lines with Zero Usage: 13.00%
+% Lines with Single Usage: 10.39%
+
+Cache: ReuseCache, Trace: 625.x264_s-33B
+IPC: 0.94
+HitRate: 3.32437
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 464.h264ref-30B
+IPC: 0.84
+HitRate: 97.5119
+TotalLines: 92134
+Lines with Zero Usage: 2236
+% Lines with Zero Usage: 2.43%
+% Lines with Single Usage: 2.48%
+
+Cache: ReuseCache, Trace: 464.h264ref-30B
+IPC: 0.84
+HitRate: 88.071
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 445.gobmk-2B
+IPC: 0.43
+HitRate: 92.6849
+TotalLines: 246095
+Lines with Zero Usage: 88684
+% Lines with Zero Usage: 36.04%
+% Lines with Single Usage: 19.21%
+
+Cache: ReuseCache, Trace: 445.gobmk-2B
+IPC: 0.43
+HitRate: 88.0737
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 433.milc-127B
+IPC: 0.43
+HitRate: 24.6089
+TotalLines: 39274310
+Lines with Zero Usage: 18865152
+% Lines with Zero Usage: 48.03%
+% Lines with Single Usage: 27.16%
+
+Cache: ReuseCache, Trace: 433.milc-127B
+IPC: 0.46
+HitRate: 3.3078499999999997
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 464.h264ref-57B
+IPC: 0.66
+HitRate: 97.5242
+TotalLines: 94849
+Lines with Zero Usage: 3825
+% Lines with Zero Usage: 4.03%
+% Lines with Single Usage: 5.49%
+
+Cache: ReuseCache, Trace: 464.h264ref-57B
+IPC: 0.66
+HitRate: 88.7876
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 403.gcc-16B
+IPC: 0.35
+HitRate: 76.7012
+TotalLines: 18706687
+Lines with Zero Usage: 489578
+% Lines with Zero Usage: 2.62%
+% Lines with Single Usage: 4.08%
+
+Cache: ReuseCache, Trace: 403.gcc-16B
+IPC: 0.32
+HitRate: 55.860299999999995
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 445.gobmk-36B
+IPC: 0.45
+HitRate: 83.4213
+TotalLines: 1127155
+Lines with Zero Usage: 375675
+% Lines with Zero Usage: 33.33%
+% Lines with Single Usage: 23.67%
+
+Cache: ReuseCache, Trace: 445.gobmk-36B
+IPC: 0.45
+HitRate: 52.8679
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 400.perlbench-41B
+IPC: 0.39
+HitRate: 62.0995
+TotalLines: 1244814
+Lines with Zero Usage: 305715
+% Lines with Zero Usage: 24.56%
+% Lines with Single Usage: 11.10%
+
+Cache: ReuseCache, Trace: 400.perlbench-41B
+IPC: 0.40
+HitRate: 68.71690000000001
+
+===============================================================================================
+Cache: ConventionalCache, Trace: 447.dealII-3B
+IPC: 0.56
+HitRate: 83.5554
+TotalLines: 536666
+Lines with Zero Usage: 118549
+% Lines with Zero Usage: 22.09%
+% Lines with Single Usage: 12.44%
+
+Cache: ReuseCache, Trace: 447.dealII-3B
+IPC: 0.56
+HitRate: 39.429199999999994
+
+===============================================================================================
