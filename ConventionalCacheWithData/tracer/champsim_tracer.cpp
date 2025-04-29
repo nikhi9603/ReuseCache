@@ -14,18 +14,26 @@
 #define NUM_INSTR_DESTINATIONS 2
 #define NUM_INSTR_SOURCES 4
 
+#define debug false
+
 typedef struct trace_instr_format
 {
     unsigned long long int ip; // instruction pointer (program counter) value
 
-    unsigned char is_branch;    // is this branch
-    unsigned char branch_taken; // if so, is this taken
+    unsigned char has_mem_is_branch; // does this have memory operands(second bit), is this branch(LSB bit)
+    unsigned char branch_taken;      // if so, is this taken
 
-    unsigned char destination_registers[NUM_INSTR_DESTINATIONS]; // output registers
-    unsigned char source_registers[NUM_INSTR_SOURCES];           // input registers
+    unsigned char destination_register[NUM_INSTR_DESTINATIONS]; // output registers
+    unsigned char source_register[NUM_INSTR_SOURCES];           // input registers
 
-    unsigned long long int destination_memory[NUM_INSTR_DESTINATIONS]; // output memory
-    unsigned long long int source_memory[NUM_INSTR_SOURCES];           // input memory
+    unsigned long long int *destination_memory_address; // output memory
+    unsigned long long int *source_memory_address;      // input memory
+
+    uint8_t *destination_memory_size; // output memory sizes
+    uint8_t *source_memory_size;      // input memory sizes
+
+    unsigned char **destination_memory_value; // output memory values
+    unsigned char **source_memory_value;      // input memory values
 } trace_instr_format_t;
 
 /* ================================================================== */
@@ -40,6 +48,8 @@ bool output_file_closed = false;
 bool tracing_on = false;
 
 trace_instr_format_t curr_instr;
+
+int memoryWriteIndex;
 
 /* ===================================================================== */
 // Command line switches
@@ -77,10 +87,9 @@ INT32 Usage()
 // Analysis routines
 /* ===================================================================== */
 
-void BeginInstruction(VOID *ip, UINT32 op_code, VOID *opstring)
+void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, VOID *opstring)
 {
     instrCount++;
-    // printf("[%p %u %s ", ip, opcode, (char*)opstring);
 
     if (instrCount > KnobSkipInstructions.Value())
     {
@@ -93,30 +102,74 @@ void BeginInstruction(VOID *ip, UINT32 op_code, VOID *opstring)
     if (!tracing_on)
         return;
 
-    // reset the current instruction
     curr_instr.ip = (unsigned long long int)ip;
 
-    curr_instr.is_branch = 0;
+    bool hasMemory = (numMemOperands != 0);
+
+    if (hasMemory)
+    {
+        curr_instr.has_mem_is_branch = 0b00000010;
+    }
+    else
+    {
+        curr_instr.has_mem_is_branch = 0;
+    }
     curr_instr.branch_taken = 0;
 
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
     {
-        curr_instr.destination_registers[i] = 0;
-        curr_instr.destination_memory[i] = 0;
+        curr_instr.destination_register[i] = 0;
     }
 
     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
     {
-        curr_instr.source_registers[i] = 0;
-        curr_instr.source_memory[i] = 0;
+        curr_instr.source_register[i] = 0;
     }
+
+    if (hasMemory)
+    {
+        curr_instr.destination_memory_address = new unsigned long long int[NUM_INSTR_DESTINATIONS];
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            curr_instr.destination_memory_address[i] = 0;
+
+        curr_instr.source_memory_address = new unsigned long long int[NUM_INSTR_SOURCES];
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            curr_instr.source_memory_address[i] = 0;
+
+        curr_instr.destination_memory_size = new uint8_t[NUM_INSTR_DESTINATIONS];
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            curr_instr.destination_memory_size[i] = 0;
+
+        curr_instr.source_memory_size = new uint8_t[NUM_INSTR_SOURCES];
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            curr_instr.source_memory_size[i] = 0;
+
+        curr_instr.destination_memory_value = new unsigned char *[NUM_INSTR_DESTINATIONS];
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            curr_instr.destination_memory_value[i] = nullptr;
+
+        curr_instr.source_memory_value = new unsigned char *[NUM_INSTR_SOURCES];
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            curr_instr.source_memory_value[i] = nullptr;
+    }
+    else
+    {
+        curr_instr.destination_memory_address = nullptr;
+        curr_instr.destination_memory_size = nullptr;
+        curr_instr.destination_memory_value = nullptr;
+
+        curr_instr.source_memory_address = nullptr;
+        curr_instr.source_memory_size = nullptr;
+        curr_instr.source_memory_value = nullptr;
+    }
+
+    memoryWriteIndex = -1;
 }
 
 void EndInstruction()
 {
-    // printf("%d]\n", (int)instrCount);
-
-    // printf("\n");
+    if (debug)
+        std::cout << "Done with instruction no: " << instrCount << std::endl;
 
     if (instrCount > KnobSkipInstructions.Value())
     {
@@ -124,13 +177,45 @@ void EndInstruction()
 
         if (instrCount <= (KnobTraceInstructions.Value() + KnobSkipInstructions.Value()))
         {
-            // keep tracing
-            fwrite(&curr_instr, sizeof(trace_instr_format_t), 1, out);
+            fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
+            fwrite(&curr_instr.has_mem_is_branch, sizeof(unsigned char), 1, out);
+            fwrite(&curr_instr.branch_taken, sizeof(unsigned char), 1, out);
+            fwrite(curr_instr.destination_register, sizeof(unsigned char), NUM_INSTR_DESTINATIONS, out);
+            fwrite(curr_instr.source_register, sizeof(unsigned char), NUM_INSTR_SOURCES, out);
+
+            if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
+            {
+
+                fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
+                fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
+                fwrite(curr_instr.destination_memory_size, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, out);
+                fwrite(curr_instr.source_memory_size, sizeof(uint8_t), NUM_INSTR_SOURCES, out);
+
+                for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+                {
+                    if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+                    {
+                        fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
+                        delete curr_instr.destination_memory_value[i];
+                        curr_instr.destination_memory_value[i] = nullptr;
+                    }
+                }
+
+                for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+                {
+                    if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                    {
+                        fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
+                        delete curr_instr.source_memory_value[i];
+                        curr_instr.source_memory_value[i] = nullptr;
+                    }
+                }
+            }
         }
         else
         {
             tracing_on = false;
-            // close down the file, we're done tracing
+
             if (!output_file_closed)
             {
                 fclose(out);
@@ -139,45 +224,31 @@ void EndInstruction()
 
             exit(0);
         }
+
+        memoryWriteIndex = -1;
     }
 }
 
-void BranchOrNot(UINT32 taken)
+void BranchOrNot(uint32_t taken)
 {
-    // printf("[%d] ", taken);
-
-    curr_instr.is_branch = 1;
+    curr_instr.has_mem_is_branch |= 0b00000001;
     if (taken != 0)
     {
         curr_instr.branch_taken = 1;
     }
 }
 
-void RegRead(UINT32 i, UINT32 index)
+void RegRead(uint32_t i, uint32_t index)
 {
     if (!tracing_on)
         return;
 
     REG r = (REG)i;
 
-    /*
-       if(r == 26)
-       {
-    // 26 is the IP, which is read and written by branches
-    return;
-    }
-    */
-
-    // std::cout << r << " " << REG_StringShort((REG)r) << " " ;
-    // std::cout << REG_StringShort((REG)r) << " " ;
-
-    // printf("%d ", (int)r);
-
-    // check to see if this register is already in the list
     int already_found = 0;
     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
     {
-        if (curr_instr.source_registers[i] == ((unsigned char)r))
+        if (curr_instr.source_register[i] == ((unsigned char)r))
         {
             already_found = 1;
             break;
@@ -187,39 +258,26 @@ void RegRead(UINT32 i, UINT32 index)
     {
         for (int i = 0; i < NUM_INSTR_SOURCES; i++)
         {
-            if (curr_instr.source_registers[i] == 0)
+            if (curr_instr.source_register[i] == 0)
             {
-                curr_instr.source_registers[i] = (unsigned char)r;
+                curr_instr.source_register[i] = (unsigned char)r;
                 break;
             }
         }
     }
 }
 
-void RegWrite(REG i, UINT32 index)
+void RegWrite(REG i, uint32_t index)
 {
     if (!tracing_on)
         return;
 
     REG r = (REG)i;
 
-    /*
-       if(r == 26)
-       {
-    // 26 is the IP, which is read and written by branches
-    return;
-    }
-    */
-
-    // std::cout << "<" << r << " " << REG_StringShort((REG)r) << "> ";
-    // std::cout << "<" << REG_StringShort((REG)r) << "> ";
-
-    // printf("<%d> ", (int)r);
-
     int already_found = 0;
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
     {
-        if (curr_instr.destination_registers[i] == ((unsigned char)r))
+        if (curr_instr.destination_register[i] == ((unsigned char)r))
         {
             already_found = 1;
             break;
@@ -229,85 +287,169 @@ void RegWrite(REG i, UINT32 index)
     {
         for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
         {
-            if (curr_instr.destination_registers[i] == 0)
+            if (curr_instr.destination_register[i] == 0)
             {
-                curr_instr.destination_registers[i] = (unsigned char)r;
+                curr_instr.destination_register[i] = (unsigned char)r;
                 break;
             }
         }
     }
-    /*
-       if(index==0)
-       {
-       curr_instr.destination_register = (unsigned long long int)r;
-       }
-       */
 }
 
-void MemoryRead(VOID *addr, UINT32 index, UINT32 read_size)
+void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
 {
     if (!tracing_on)
         return;
 
-    // printf("0x%llx,%u ", (unsigned long long int)addr, read_size);
-
-    // check to see if this memory read location is already in the list
-    int already_found = 0;
+    bool already_found = false;
     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
     {
-        if (curr_instr.source_memory[i] == ((unsigned long long int)addr))
+        if (curr_instr.source_memory_address[i] == ((unsigned long long int)addr))
         {
-            already_found = 1;
+            already_found = true;
             break;
         }
     }
-    if (already_found == 0)
+
+    if (!already_found)
     {
         for (int i = 0; i < NUM_INSTR_SOURCES; i++)
         {
-            if (curr_instr.source_memory[i] == 0)
+            if (curr_instr.source_memory_address[i] == 0)
             {
-                curr_instr.source_memory[i] = (unsigned long long int)addr;
+                curr_instr.source_memory_address[i] = (unsigned long long int)addr;
+                curr_instr.source_memory_size[i] = read_size;
+                curr_instr.source_memory_value[i] = new unsigned char[read_size];
+
+                if (debug)
+                    std::cout << "Instruction read " << read_size << " bytes at 0x" << std::hex << addr << std::endl;
+
+                if (PIN_SafeCopy(curr_instr.source_memory_value[i], addr, read_size) == read_size)
+                {
+                    if (debug)
+                    {
+                        std::cout << "Obtained memory from 0x" << std::hex << addr << "with value ";
+                        for (uint32_t j = 0; j < read_size; j++)
+                        {
+                            std::cout << std::hex << (int)curr_instr.source_memory_value[i][j];
+                        }
+                        std::cout << std::dec << std::endl;
+                    }
+                }
+                else
+                {
+                    delete curr_instr.source_memory_value[i];
+                    curr_instr.source_memory_value[i] = nullptr;
+                    curr_instr.source_memory_size[i] = 0;
+
+                    if (debug)
+                        std::cout << "Failed to obtain memory from 0x" << std::hex << addr << std::dec << std::endl;
+                }
+
                 break;
             }
         }
     }
 }
 
-void MemoryWrite(VOID *addr, UINT32 index)
+void MemoryWriteCaptureAddress(VOID *addr, uint32_t index)
 {
     if (!tracing_on)
         return;
 
-    // printf("(0x%llx) ", (unsigned long long int) addr);
-
-    // check to see if this memory write location is already in the list
-    int already_found = 0;
+    bool already_found = false;
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
     {
-        if (curr_instr.destination_memory[i] == ((unsigned long long int)addr))
+        if (curr_instr.destination_memory_address[i] == ((unsigned long long int)addr))
         {
-            already_found = 1;
+            already_found = true;
             break;
         }
     }
-    if (already_found == 0)
+
+    if (!already_found)
     {
         for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
         {
-            if (curr_instr.destination_memory[i] == 0)
+            if (curr_instr.destination_memory_address[i] == 0)
             {
-                curr_instr.destination_memory[i] = (unsigned long long int)addr;
+                curr_instr.destination_memory_address[i] = (unsigned long long int)addr;
+                memoryWriteIndex = i;
                 break;
             }
         }
     }
-    /*
-       if(index==0)
-       {
-       curr_instr.destination_memory = (long long int)addr;
-       }
-       */
+}
+
+void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
+{
+    if (!tracing_on)
+        return;
+
+    if (memoryWriteIndex != -1)
+    {
+        curr_instr.destination_memory_size[memoryWriteIndex] = write_size;
+        curr_instr.destination_memory_value[memoryWriteIndex] = new unsigned char[write_size];
+        unsigned long long int *addr = (unsigned long long int *)(curr_instr.destination_memory_address[memoryWriteIndex]);
+
+        if (debug)
+            std::cout << "Instruction wrote " << write_size << " bytes at 0x" << std::hex << addr << std::dec << std::endl;
+
+        if (PIN_SafeCopy(curr_instr.destination_memory_value[memoryWriteIndex], addr, write_size) == write_size)
+        {
+            if (debug)
+            {
+                std::cout << "Obtained memory from " << std::hex << addr << "with value ";
+                for (uint32_t j = 0; j < write_size; j++)
+                {
+                    std::cout << std::hex << (int)curr_instr.destination_memory_value[memoryWriteIndex][j];
+                }
+                std::cout << std::dec << std::endl;
+            }
+        }
+        else
+        {
+            delete curr_instr.destination_memory_value[memoryWriteIndex];
+            curr_instr.destination_memory_size[memoryWriteIndex] = 0;
+            curr_instr.destination_memory_value[memoryWriteIndex] = nullptr;
+
+            if (debug)
+                std::cout << "Failed to obtain memory from 0x" << std::hex << addr << std::endl;
+        }
+
+        memoryWriteIndex = -1;
+    }
+    else
+    {
+        if (debug)
+            std::cout << "Memory write value instrumentation failed to find a memory write address" << std::endl;
+    }
+}
+
+void MemoryWriteValueForCall()
+{
+    if (!tracing_on)
+        return;
+
+    if (memoryWriteIndex != -1)
+    {
+        curr_instr.destination_memory_size[memoryWriteIndex] = 0;
+        curr_instr.destination_memory_value[memoryWriteIndex] = nullptr;
+        memoryWriteIndex = -1;
+    }
+    else
+    {
+        curr_instr.destination_memory_size[memoryWriteIndex] = 8;
+        curr_instr.destination_memory_value[memoryWriteIndex] = new unsigned char[8];
+        unsigned long long int return_address = curr_instr.ip + 4;
+        std::memcpy(curr_instr.destination_memory_value[memoryWriteIndex], &return_address, 8);
+
+        memoryWriteIndex = -1;
+
+        if (debug)
+            std::cout << "Memory write value for call instruction at 0x" << std::hex << curr_instr.ip
+                      << " with value " << return_address << std::dec << std::endl;
+    }
 }
 
 /* ===================================================================== */
@@ -317,60 +459,103 @@ void MemoryWrite(VOID *addr, UINT32 index)
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID *v)
 {
+    uint32_t memOperands = INS_MemoryOperandCount(ins);
+
     // begin each instruction with this function
-    UINT32 opcode = INS_Opcode(ins);
-    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction, IARG_INST_PTR, IARG_UINT32, opcode, IARG_END);
+    uint32_t opcode = INS_Opcode(ins);
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction,
+                   IARG_INST_PTR,
+                   IARG_UINT32, opcode,
+                   IARG_UINT32, memOperands,
+                   IARG_CALL_ORDER, CALL_ORDER_FIRST,
+                   IARG_END);
 
     // instrument branch instructions
     if (INS_IsBranch(ins))
-        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_END);
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot,
+                       IARG_BRANCH_TAKEN,
+                       IARG_END);
 
     // instrument register reads
-    UINT32 readRegCount = INS_MaxNumRRegs(ins);
-    for (UINT32 i = 0; i < readRegCount; i++)
+    uint32_t readRegCount = INS_MaxNumRRegs(ins);
+    for (uint32_t i = 0; i < readRegCount; i++)
     {
-        UINT32 regNum = INS_RegR(ins, i);
+        uint32_t regNum = INS_RegR(ins, i);
 
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)RegRead,
-                       IARG_UINT32, regNum, IARG_UINT32, i,
+                       IARG_UINT32, regNum,
+                       IARG_UINT32, i,
                        IARG_END);
     }
 
     // instrument register writes
-    UINT32 writeRegCount = INS_MaxNumWRegs(ins);
-    for (UINT32 i = 0; i < writeRegCount; i++)
+    uint32_t writeRegCount = INS_MaxNumWRegs(ins);
+    for (uint32_t i = 0; i < writeRegCount; i++)
     {
-        UINT32 regNum = INS_RegW(ins, i);
+        uint32_t regNum = INS_RegW(ins, i);
 
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)RegWrite,
-                       IARG_UINT32, regNum, IARG_UINT32, i,
+                       IARG_UINT32, regNum,
+                       IARG_UINT32, i,
                        IARG_END);
     }
 
     // instrument memory reads and writes
-    UINT32 memOperands = INS_MemoryOperandCount(ins);
 
     // Iterate over each memory operand of the instruction.
-    for (UINT32 memOp = 0; memOp < memOperands; memOp++)
+    for (uint32_t memOp = 0; memOp < memOperands; memOp++)
     {
         if (INS_MemoryOperandIsRead(ins, memOp))
         {
-            UINT32 read_size = INS_MemoryOperandSize(ins, memOp);
+            uint32_t read_size = INS_MemoryOperandSize(ins, memOp);
 
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryRead,
-                           IARG_MEMORYOP_EA, memOp, IARG_UINT32, memOp, IARG_UINT32, read_size,
+                           IARG_MEMORYOP_EA, memOp,
+                           IARG_UINT32, memOp,
+                           IARG_UINT32, read_size,
                            IARG_END);
         }
+
         if (INS_MemoryOperandIsWritten(ins, memOp))
         {
-            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryWrite,
-                           IARG_MEMORYOP_EA, memOp, IARG_UINT32, memOp,
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryWriteCaptureAddress,
+                           IARG_MEMORYOP_EA, memOp,
+                           IARG_UINT32, memOp,
                            IARG_END);
+
+            if (INS_HasFallThrough(ins))
+            {
+                uint32_t write_size = INS_MemoryOperandSize(ins, memOp);
+                INS_InsertCall(ins, IPOINT_AFTER, (AFUNPTR)MemoryWriteCaptureValue,
+                               IARG_UINT32, memOp,
+                               IARG_UINT32, write_size,
+                               IARG_END);
+            }
+            else if (INS_IsCall(ins))
+            {
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryWriteValueForCall,
+                               IARG_END);
+            }
+            else
+            {
+                if (debug)
+                {
+                    std::cout << "Warning: Memory write instrumentation at IPOINT_AFTER for instruction ** " << INS_Disassemble(ins) << " ** is invalid" << std::endl;
+                    std::cout << "Opcode: " << std::dec << INS_Opcode(ins) << std::endl;
+                }
+            }
         }
     }
 
     // finalize each instruction with this function
-    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)EndInstruction, IARG_END);
+    if (INS_HasFallThrough((ins)))
+        INS_InsertCall(ins, IPOINT_AFTER, (AFUNPTR)EndInstruction,
+                       IARG_CALL_ORDER, CALL_ORDER_LAST,
+                       IARG_END);
+    else
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)EndInstruction,
+                       IARG_CALL_ORDER, CALL_ORDER_LAST,
+                       IARG_END);
 }
 
 /*!
@@ -406,7 +591,7 @@ int main(int argc, char *argv[])
 
     const char *fileName = KnobOutputFile.Value().c_str();
 
-    out = fopen(fileName, "ab");
+    out = fopen(fileName, "wb");
     if (!out)
     {
         std::cout << "Couldn't open output trace file. Exiting." << std::endl;
@@ -419,10 +604,10 @@ int main(int argc, char *argv[])
     // Register function to be called when the application exits
     PIN_AddFiniFunction(Fini, 0);
 
-    // std::cerr <<  "===============================================" << std::endl;
-    // std::cerr <<  "This application is instrumented by the Champsim Trace Generator" << std::endl;
-    // std::cerr <<  "Trace saved in " << KnobOutputFile.Value() << std::endl;
-    // std::cerr <<  "===============================================" << std::endl;
+    // cerr <<  "===============================================" << endl;
+    // cerr <<  "This application is instrumented by the Champsim Trace Generator" << endl;
+    // cerr <<  "Trace saved in " << KnobOutputFile.Value() << endl;
+    // cerr <<  "===============================================" << endl;
 
     // Start the program, never returns
     PIN_StartProgram();
