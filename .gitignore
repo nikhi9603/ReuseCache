@@ -6,14 +6,17 @@
 *.gz
 *.out
 ConventionalCache/obj/*
+ConventionalCacheWithData/obj/*
 ReuseCache/obj/*
 ReuseCacheWithData/obj/*
 traces/
 speccpu-traces/
 ConventionalCache/bin/*
+ConventionalCacheWithData/bin/*
 ReuseCache/bin/*
 ReuseCacheWithData/bin/*
 ReuseCache/reuse_cache_output/*
 ConventionalCache/cache_output/*
+ConventionalCacheWithData/cache_output/*
 ONNX-Runtime-Inference/build
 ONNX-Runtime-Inference/data/models
