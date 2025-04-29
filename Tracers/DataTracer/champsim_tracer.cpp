@@ -14,6 +14,9 @@
 #define NUM_INSTR_DESTINATIONS 2
 #define NUM_INSTR_SOURCES 4
 
+#define SIZE_OF_CALL_INSTRUCTION 5
+#define MAX_MEMORY_SIZE 64
+
 #define debug false
 
 typedef struct trace_instr_format
@@ -48,6 +51,7 @@ bool output_file_closed = false;
 bool tracing_on = false;
 
 trace_instr_format_t curr_instr;
+bool skip_curr_instr = false;
 
 int memoryWriteIndex;
 
@@ -57,7 +61,7 @@ int memoryWriteIndex;
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "champsim.trace",
                                  "specify file name for Champsim tracer output");
 
-KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "5000000000",
+KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "2000000000",
                                   "How many instructions to skip before tracing begins");
 
 KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "2000000000",
@@ -171,7 +175,7 @@ void EndInstruction()
     if (debug)
         std::cout << "Done with instruction no: " << instrCount << std::endl;
 
-    if (instrCount > KnobSkipInstructions.Value())
+    if (instrCount > KnobSkipInstructions.Value() && !skip_curr_instr)
     {
         tracing_on = true;
 
@@ -226,6 +230,7 @@ void EndInstruction()
         }
 
         memoryWriteIndex = -1;
+        skip_curr_instr = false;
     }
 }
 
@@ -441,7 +446,7 @@ void MemoryWriteValueForCall()
     {
         curr_instr.destination_memory_size[memoryWriteIndex] = 8;
         curr_instr.destination_memory_value[memoryWriteIndex] = new unsigned char[8];
-        unsigned long long int return_address = curr_instr.ip + 4;
+        unsigned long long int return_address = curr_instr.ip + SIZE_OF_CALL_INSTRUCTION;
         std::memcpy(curr_instr.destination_memory_value[memoryWriteIndex], &return_address, 8);
 
         memoryWriteIndex = -1;
@@ -508,6 +513,11 @@ VOID Instruction(INS ins, VOID *v)
         if (INS_MemoryOperandIsRead(ins, memOp))
         {
             uint32_t read_size = INS_MemoryOperandSize(ins, memOp);
+            if (read_size > MAX_MEMORY_SIZE)
+            {
+                skip_curr_instr = true;
+                break;
+            }
 
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryRead,
                            IARG_MEMORYOP_EA, memOp,

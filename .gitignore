@@ -4,6 +4,7 @@
 *.log
 *.trace
 *.gz
+*.xz
 *.out
 ConventionalCache/obj/*
 ConventionalCacheWithData/obj/*
