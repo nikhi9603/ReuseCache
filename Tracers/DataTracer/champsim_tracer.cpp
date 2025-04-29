@@ -175,44 +175,56 @@ void EndInstruction()
     if (debug)
         std::cout << "Done with instruction no: " << instrCount << std::endl;
 
-    if (instrCount > KnobSkipInstructions.Value() && !skip_curr_instr)
+    if (instrCount > KnobSkipInstructions.Value())
     {
         tracing_on = true;
 
         if (instrCount <= (KnobTraceInstructions.Value() + KnobSkipInstructions.Value()))
         {
-            fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
-            fwrite(&curr_instr.has_mem_is_branch, sizeof(unsigned char), 1, out);
-            fwrite(&curr_instr.branch_taken, sizeof(unsigned char), 1, out);
-            fwrite(curr_instr.destination_register, sizeof(unsigned char), NUM_INSTR_DESTINATIONS, out);
-            fwrite(curr_instr.source_register, sizeof(unsigned char), NUM_INSTR_SOURCES, out);
-
-            if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
+            if (!skip_curr_instr)
             {
+                fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
+                fwrite(&curr_instr.has_mem_is_branch, sizeof(unsigned char), 1, out);
+                fwrite(&curr_instr.branch_taken, sizeof(unsigned char), 1, out);
+                fwrite(curr_instr.destination_register, sizeof(unsigned char), NUM_INSTR_DESTINATIONS, out);
+                fwrite(curr_instr.source_register, sizeof(unsigned char), NUM_INSTR_SOURCES, out);
 
-                fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
-                fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
-                fwrite(curr_instr.destination_memory_size, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, out);
-                fwrite(curr_instr.source_memory_size, sizeof(uint8_t), NUM_INSTR_SOURCES, out);
-
-                for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+                if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
                 {
-                    if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
-                    {
-                        fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
-                        delete curr_instr.destination_memory_value[i];
-                        curr_instr.destination_memory_value[i] = nullptr;
-                    }
-                }
 
-                for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-                {
-                    if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                    fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
+                    fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
+                    fwrite(curr_instr.destination_memory_size, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, out);
+                    fwrite(curr_instr.source_memory_size, sizeof(uint8_t), NUM_INSTR_SOURCES, out);
+
+                    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
                     {
-                        fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
-                        delete curr_instr.source_memory_value[i];
-                        curr_instr.source_memory_value[i] = nullptr;
+                        if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+                        {
+                            fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
+                            delete curr_instr.destination_memory_value[i];
+                            curr_instr.destination_memory_value[i] = nullptr;
+                        }
                     }
+
+                    for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+                    {
+                        if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                        {
+                            fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
+                            delete curr_instr.source_memory_value[i];
+                            curr_instr.source_memory_value[i] = nullptr;
+                        }
+                    }
+
+                    delete[] curr_instr.destination_memory_address;
+                    curr_instr.destination_memory_address = nullptr;
+                    delete[] curr_instr.source_memory_address;
+                    curr_instr.source_memory_address = nullptr;
+                    delete[] curr_instr.destination_memory_size;
+                    curr_instr.destination_memory_size = nullptr;
+                    delete[] curr_instr.source_memory_size;
+                    curr_instr.source_memory_size = nullptr;
                 }
             }
         }
@@ -231,6 +243,36 @@ void EndInstruction()
 
         memoryWriteIndex = -1;
         skip_curr_instr = false;
+
+        if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
+        {
+            for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            {
+                if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+                {
+                    delete curr_instr.destination_memory_value[i];
+                    curr_instr.destination_memory_value[i] = nullptr;
+                }
+            }
+
+            for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            {
+                if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                {
+                    delete curr_instr.source_memory_value[i];
+                    curr_instr.source_memory_value[i] = nullptr;
+                }
+            }
+
+            delete[] curr_instr.destination_memory_address;
+            curr_instr.destination_memory_address = nullptr;
+            delete[] curr_instr.source_memory_address;
+            curr_instr.source_memory_address = nullptr;
+            delete[] curr_instr.destination_memory_size;
+            curr_instr.destination_memory_size = nullptr;
+            delete[] curr_instr.source_memory_size;
+            curr_instr.source_memory_size = nullptr;
+        }
     }
 }
 
@@ -536,6 +578,12 @@ VOID Instruction(INS ins, VOID *v)
             if (INS_HasFallThrough(ins))
             {
                 uint32_t write_size = INS_MemoryOperandSize(ins, memOp);
+                if (write_size > MAX_MEMORY_SIZE)
+                {
+                    skip_curr_instr = true;
+                    break;
+                }
+
                 INS_InsertCall(ins, IPOINT_AFTER, (AFUNPTR)MemoryWriteCaptureValue,
                                IARG_UINT32, memOp,
                                IARG_UINT32, write_size,
