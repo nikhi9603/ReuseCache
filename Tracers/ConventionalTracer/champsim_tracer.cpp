@@ -46,7 +46,7 @@ trace_instr_format_t curr_instr;
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE,  "pintool", "o", "champsim.trace", 
         "specify file name for Champsim tracer output");
 
-KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "2000000000", 
+KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "0", 
         "How many instructions to skip before tracing begins");
 
 KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "2000000000", 
@@ -311,6 +311,11 @@ void MemoryWrite(VOID* addr, UINT32 index)
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID *v)
 {
+    IMG img = IMG_FindByAddress(INS_Address(ins));
+
+    if (!IMG_Valid(img) || !IMG_IsMainExecutable(img))
+        return;
+        
     // begin each instruction with this function
     UINT32 opcode = INS_Opcode(ins);
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction, IARG_INST_PTR, IARG_UINT32, opcode, IARG_END);

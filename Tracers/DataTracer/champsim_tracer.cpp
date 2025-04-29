@@ -61,7 +61,7 @@ int memoryWriteIndex;
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "champsim.trace",
                                  "specify file name for Champsim tracer output");
 
-KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "2000000000",
+KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "0",
                                   "How many instructions to skip before tracing begins");
 
 KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "2000000000",
@@ -181,6 +181,11 @@ void EndInstruction()
 
         if (instrCount <= (KnobTraceInstructions.Value() + KnobSkipInstructions.Value()))
         {
+            if ((instrCount - KnobSkipInstructions.Value()) % 10000000 == 0)
+            {
+                std::cout << "Traced " << (instrCount - KnobSkipInstructions.Value()) << " instructions" << std::endl;
+            }
+
             if (!skip_curr_instr)
             {
                 fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
@@ -227,6 +232,41 @@ void EndInstruction()
                     curr_instr.source_memory_size = nullptr;
                 }
             }
+            else
+            {
+                skip_curr_instr = false;
+                instrCount--;
+
+                if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
+                {
+                    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+                    {
+                        if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+                        {
+                            delete curr_instr.destination_memory_value[i];
+                            curr_instr.destination_memory_value[i] = nullptr;
+                        }
+                    }
+
+                    for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+                    {
+                        if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                        {
+                            delete curr_instr.source_memory_value[i];
+                            curr_instr.source_memory_value[i] = nullptr;
+                        }
+                    }
+
+                    delete[] curr_instr.destination_memory_address;
+                    curr_instr.destination_memory_address = nullptr;
+                    delete[] curr_instr.source_memory_address;
+                    curr_instr.source_memory_address = nullptr;
+                    delete[] curr_instr.destination_memory_size;
+                    curr_instr.destination_memory_size = nullptr;
+                    delete[] curr_instr.source_memory_size;
+                    curr_instr.source_memory_size = nullptr;
+                }
+            }
         }
         else
         {
@@ -242,37 +282,6 @@ void EndInstruction()
         }
 
         memoryWriteIndex = -1;
-        skip_curr_instr = false;
-
-        if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
-        {
-            for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-            {
-                if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
-                {
-                    delete curr_instr.destination_memory_value[i];
-                    curr_instr.destination_memory_value[i] = nullptr;
-                }
-            }
-
-            for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-            {
-                if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
-                {
-                    delete curr_instr.source_memory_value[i];
-                    curr_instr.source_memory_value[i] = nullptr;
-                }
-            }
-
-            delete[] curr_instr.destination_memory_address;
-            curr_instr.destination_memory_address = nullptr;
-            delete[] curr_instr.source_memory_address;
-            curr_instr.source_memory_address = nullptr;
-            delete[] curr_instr.destination_memory_size;
-            curr_instr.destination_memory_size = nullptr;
-            delete[] curr_instr.source_memory_size;
-            curr_instr.source_memory_size = nullptr;
-        }
     }
 }
 
