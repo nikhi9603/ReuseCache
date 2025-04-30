@@ -69,15 +69,15 @@ void O3_CPU::read_from_trace()
                 // cout << "*** Reached end of trace for Core: " << cpu << " Repeating trace: " << trace_string << endl;
                 // TRACE_ENDS_STOP = 1; /*@Vasudha - STOP simulation once trace file ends*/
                 //  close the trace file and re-open it
-                if (!knob_uncompressed_trace)
-                {
-                    pclose(trace_file);
-                    trace_file = popen(gunzip_command, "r");
-                }
-                else
+                if (knob_uncompressed_trace)
                 {
                     fclose(trace_file);
                     trace_file = fopen(trace_string, "r");
+                }
+                else
+                {
+                    pclose(trace_file);
+                    trace_file = popen(gunzip_command, "r");
                 }
 
                 if (trace_file == NULL)
@@ -234,15 +234,15 @@ void O3_CPU::read_from_trace()
                 cout << "*** Reached end of trace for Core: " << cpu << " Repeating trace: " << trace_string << endl;
 
                 // close the trace file and re-open it
-                if (!knob_uncompressed_trace)
-                {
-                    pclose(trace_file);
-                    trace_file = popen(gunzip_command, "r");
-                }
-                else
+                if (knob_uncompressed_trace)
                 {
                     fclose(trace_file);
                     trace_file = fopen(trace_string, "r");
+                }
+                else
+                {
+                    pclose(trace_file);
+                    trace_file = popen(gunzip_command, "r");
                 }
 
                 if (trace_file == NULL)
