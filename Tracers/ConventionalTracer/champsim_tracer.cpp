@@ -123,6 +123,11 @@ void EndInstruction()
         if(instrCount <= (KnobTraceInstructions.Value()+KnobSkipInstructions.Value()))
         {
             // keep tracing
+            if ((instrCount - KnobSkipInstructions.Value()) % 10000000 == 0)
+            {
+                std::cout << "Traced " << (instrCount - KnobSkipInstructions.Value()) << " instructions" << std::endl;
+            }
+            
             fwrite(&curr_instr, sizeof(trace_instr_format_t), 1, out);
         }
         else
@@ -310,12 +315,7 @@ void MemoryWrite(VOID* addr, UINT32 index)
 
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID *v)
-{
-    IMG img = IMG_FindByAddress(INS_Address(ins));
-
-    if (!IMG_Valid(img) || !IMG_IsMainExecutable(img))
-        return;
-        
+{       
     // begin each instruction with this function
     UINT32 opcode = INS_Opcode(ins);
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction, IARG_INST_PTR, IARG_UINT32, opcode, IARG_END);

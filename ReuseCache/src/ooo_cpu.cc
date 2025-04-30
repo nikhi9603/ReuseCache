@@ -69,10 +69,17 @@ void O3_CPU::read_from_trace()
                 // cout << "*** Reached end of trace for Core: " << cpu << " Repeating trace: " << trace_string << endl;
                 // TRACE_ENDS_STOP = 1; /*@Vasudha - STOP simulation once trace file ends*/
                 //  close the trace file and re-open it
-                pclose(trace_file);
-                // Neelu: Commenting return on trace file end, need to keep reading trace for equal number of instructions simulation for all cores in multi-core.
-                // return; /*@Vasudha */
-                trace_file = popen(gunzip_command, "r");
+                if (!knob_uncompressed_trace)
+                {
+                    pclose(trace_file);
+                    trace_file = popen(gunzip_command, "r");
+                }
+                else
+                {
+                    fclose(trace_file);
+                    trace_file = fopen(trace_string, "r");
+                }
+
                 if (trace_file == NULL)
                 {
                     cerr << endl
@@ -227,8 +234,17 @@ void O3_CPU::read_from_trace()
                 cout << "*** Reached end of trace for Core: " << cpu << " Repeating trace: " << trace_string << endl;
 
                 // close the trace file and re-open it
-                pclose(trace_file);
-                trace_file = popen(gunzip_command, "r");
+                if (!knob_uncompressed_trace)
+                {
+                    pclose(trace_file);
+                    trace_file = popen(gunzip_command, "r");
+                }
+                else
+                {
+                    fclose(trace_file);
+                    trace_file = fopen(trace_string, "r");
+                }
+
                 if (trace_file == NULL)
                 {
                     cerr << endl

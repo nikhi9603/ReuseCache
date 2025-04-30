@@ -23,10 +23,11 @@ download_trace() {
     local tracer=$2
     local output_file=$3
     local output_file_path=$4
+    local core=$5
 
     echo "Creating trace for $model with $tracer"
 
-    pin -t "$tracer" -o "$output_file" -- build/src/inference --use_cpu $model > /dev/null 2>&1
+    taskset -c "$core" pin -t "$tracer" -o "$output_file" -- build/src/inference --use_cpu $model > /dev/null 2>&1
     xz -9 -T0 "$output_file" > /dev/null 2>&1
     mv "$output_file.xz" "$output_file_path/$output_file.xz"
 
@@ -36,10 +37,10 @@ download_trace() {
 for model in $MODELS_DIR/*.onnx; do
     model_name=$(basename "$model" .onnx)
 
-    download_trace "$model" "$CONVENTIONAL_TRACER" "$model_name.normal.trace" "$CONVENTIONAL_TRACE_DIR" &
+    download_trace "$model" "$CONVENTIONAL_TRACER" "$model_name.normal.trace" "$CONVENTIONAL_TRACE_DIR" "16" &
     ((job_count++))
 
-    download_trace "$model" "$DATA_TRACER" "$model_name.data.trace" "$DATA_TRACE_DIR" &
+    download_trace "$model" "$DATA_TRACER" "$model_name.data.trace" "$DATA_TRACE_DIR" "17" &
     ((job_count++))
 
     # Limit parallel jobs

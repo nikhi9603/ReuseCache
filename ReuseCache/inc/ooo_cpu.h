@@ -33,6 +33,7 @@ using namespace std;
 
 extern uint32_t SCHEDULING_LATENCY, EXEC_LATENCY, DECODE_LATENCY;
 extern uint8_t TRACE_ENDS_STOP;
+extern uint8_t knob_uncompressed_trace;
 
 // cpu
 class O3_CPU

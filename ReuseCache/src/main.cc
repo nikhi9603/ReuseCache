@@ -39,7 +39,8 @@ uint8_t warmup_complete[NUM_CPUS],
     MAX_INSTR_DESTINATIONS = NUM_INSTR_DESTINATIONS,
     knob_cloudsuite = 0,
     knob_low_bandwidth = 0,
-    knob_context_switch = 0;
+    knob_context_switch = 0,
+    knob_uncompressed_trace = 0;
 
 uint64_t warmup_instructions = 10000000,
          simulation_instructions = 10000000,
@@ -1044,6 +1045,7 @@ int main(int argc, char **argv)
                 {"cloudsuite", no_argument, 0, 'c'},
                 {"cvp_trace", no_argument, 0, 'v'},
                 {"low_bandwidth", no_argument, 0, 'b'},
+                {"uncompressed_trace", no_argument, 0, 'u'},
                 {"traces", no_argument, 0, 't'},
                 {"context_switch", required_argument, 0, 's'},
                 {"reuse_cache_llc", no_argument, 0, 'r'},
@@ -1077,6 +1079,10 @@ int main(int argc, char **argv)
         case 'b':
             std::cout << "Low Bandwidth" << std::endl;
             knob_low_bandwidth = 1;
+            break;
+        case 'u':
+            knob_uncompressed_trace = 1;
+            std::cout << "All cores run uncompressed traces" << std::endl;
             break;
         case 't':
             traces_encountered = 1;
@@ -1157,14 +1163,17 @@ int main(int argc, char **argv)
                 assert(false);
             }
 
-            if (full_name[last_dot - full_name + 1] == 'g') // gzip format
-                sprintf(ooo_cpu[count_traces].gunzip_command, "gunzip -c %s", argv[i]);
-            else if (full_name[last_dot - full_name + 1] == 'x') // xz
-                sprintf(ooo_cpu[count_traces].gunzip_command, "xz -dc %s", argv[i]);
-            else
+            if (!knob_uncompressed_trace)
             {
-                cout << "ChampSim does not support traces other than gz or xz compression!" << endl;
-                assert(0);
+                if (full_name[last_dot - full_name + 1] == 'g') // gzip format
+                    sprintf(ooo_cpu[count_traces].gunzip_command, "gunzip -c %s", argv[i]);
+                else if (full_name[last_dot - full_name + 1] == 'x') // xz
+                    sprintf(ooo_cpu[count_traces].gunzip_command, "xz -dc %s", argv[i]);
+                else
+                {
+                    cout << "ChampSim does not support traces other than gz or xz compression!" << endl;
+                    assert(0);
+                }
             }
 
             char *pch[100];
@@ -1188,11 +1197,23 @@ int main(int argc, char **argv)
                 j++;
             }
 
-            ooo_cpu[count_traces].trace_file = popen(ooo_cpu[count_traces].gunzip_command, "r");
-            if (ooo_cpu[count_traces].trace_file == NULL)
+            if (knob_uncompressed_trace)
             {
-                printf("\n*** Trace file not found: %s ***\n\n", argv[i]);
-                assert(0);
+                ooo_cpu[count_traces].trace_file = fopen(ooo_cpu[count_traces].trace_string, "r");
+                if (ooo_cpu[count_traces].trace_file == NULL)
+                {
+                    printf("\n*** Trace file not found: %s ***\n\n", argv[i]);
+                    assert(0);
+                }
+            }
+            else
+            {
+                ooo_cpu[count_traces].trace_file = popen(ooo_cpu[count_traces].gunzip_command, "r");
+                if (ooo_cpu[count_traces].trace_file == NULL)
+                {
+                    printf("\n*** Trace file not found: %s ***\n\n", argv[i]);
+                    assert(0);
+                }
             }
 
             count_traces++;
@@ -1785,6 +1806,15 @@ int main(int argc, char **argv)
              << "Total Simulation Statistics (not including warmup)" << endl;
         for (uint32_t i = 0; i < NUM_CPUS; i++)
         {
+            if (knob_uncompressed_trace)
+            {
+                fclose(ooo_cpu[i].trace_file);
+            }
+            else
+            {
+                pclose(ooo_cpu[i].trace_file);
+            }
+
             cout << endl
                  << "CPU " << i << " cumulative IPC: " << (float)(ooo_cpu[i].num_retired - ooo_cpu[i].begin_sim_instr) / (current_core_cycle[i] - ooo_cpu[i].begin_sim_cycle);
             cout << " instructions: " << ooo_cpu[i].num_retired - ooo_cpu[i].begin_sim_instr << " cycles: " << current_core_cycle[i] - ooo_cpu[i].begin_sim_cycle << endl;
