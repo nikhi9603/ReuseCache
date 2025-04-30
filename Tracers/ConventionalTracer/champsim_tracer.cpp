@@ -46,11 +46,11 @@ trace_instr_format_t curr_instr;
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE,  "pintool", "o", "champsim.trace", 
         "specify file name for Champsim tracer output");
 
-KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "0", 
-        "How many instructions to skip before tracing begins");
+KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "900000000",
+                                  "How many instructions to skip before tracing begins");
 
-KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "2000000000", 
-        "How many instructions to trace");
+KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "500000000",
+                                   "How many instructions to trace");
 
 /* ===================================================================== */
 // Utilities
@@ -93,6 +93,8 @@ void BeginInstruction(VOID *ip, UINT32 op_code, VOID *opstring)
 
     // reset the current instruction
     curr_instr.ip = (unsigned long long int)ip;
+    if (curr_instr.ip < 64)
+	std::cout << "Very low IP" << std::endl;    
 
     curr_instr.is_branch = 0;
     curr_instr.branch_taken = 0;
