@@ -1800,21 +1800,25 @@ int main(int argc, char **argv)
 
     cout << endl
          << "ChampSim completed all CPUs" << endl;
+
+    for(int i = 0; i < NUM_CPUS; i++)
+    {
+        if (knob_uncompressed_trace)
+        {
+            fclose(ooo_cpu[i].trace_file);
+        }
+        else
+        {
+            pclose(ooo_cpu[i].trace_file);
+        }
+    }
+    
     if (NUM_CPUS > 1)
     {
         cout << endl
              << "Total Simulation Statistics (not including warmup)" << endl;
         for (uint32_t i = 0; i < NUM_CPUS; i++)
         {
-            if(knob_uncompressed_trace)
-            {
-                fclose(ooo_cpu[i].trace_file);
-            }
-            else
-            {
-                pclose(ooo_cpu[i].trace_file);
-            }
-
             cout << endl
                  << "CPU " << i << " cumulative IPC: " << (float)(ooo_cpu[i].num_retired - ooo_cpu[i].begin_sim_instr) / (current_core_cycle[i] - ooo_cpu[i].begin_sim_cycle);
             cout << " instructions: " << ooo_cpu[i].num_retired - ooo_cpu[i].begin_sim_instr << " cycles: " << current_core_cycle[i] - ooo_cpu[i].begin_sim_cycle << endl;
