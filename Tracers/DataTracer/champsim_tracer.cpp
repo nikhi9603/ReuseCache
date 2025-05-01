@@ -55,16 +55,22 @@ bool skip_curr_instr = false;
 
 int memoryWriteIndex;
 
+// std::map<UINT64, UINT64> read_size_map;
+// std::map<UINT64, UINT64> write_size_map;
+
+// std::set<UINT64> read_set;
+// std::set<UINT64> write_set;
+
 /* ===================================================================== */
 // Command line switches
 /* ===================================================================== */
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "champsim.trace",
                                  "specify file name for Champsim tracer output");
 
-KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "900000000",
+KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "500000000",
                                   "How many instructions to skip before tracing begins");
 
-KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "500000000",
+KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "450000000",
                                    "How many instructions to trace");
 
 /* ===================================================================== */
@@ -91,7 +97,7 @@ INT32 Usage()
 // Analysis routines
 /* ===================================================================== */
 
-void BeginInstruction(VOID *ip, UINT32 op_code, UINT32 numMemOperands, VOID *opstring)
+void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, VOID *opstring)
 {
     instrCount++;
 
@@ -107,8 +113,6 @@ void BeginInstruction(VOID *ip, UINT32 op_code, UINT32 numMemOperands, VOID *ops
         return;
 
     curr_instr.ip = (unsigned long long int)ip;
-    if (curr_instr.ip < 64)
-        std::cout << "Very low IP" << std::endl;
 
     bool hasMemory = (numMemOperands != 0);
 
@@ -198,7 +202,6 @@ void EndInstruction()
 
                 if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
                 {
-
                     fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
                     fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
                     fwrite(curr_instr.destination_memory_size, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, out);
@@ -206,6 +209,11 @@ void EndInstruction()
 
                     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
                     {
+                        if (curr_instr.destination_memory_size[i] > MAX_MEMORY_SIZE)
+                        {
+                            std::cout << "More than MAX_MEMORY_SIZE(" << MAX_MEMORY_SIZE << ") traced. Error!" << std::endl;
+                            exit(0);
+                        }
                         if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
                         {
                             fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
@@ -216,6 +224,12 @@ void EndInstruction()
 
                     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
                     {
+                        if (curr_instr.source_memory_size[i] > MAX_MEMORY_SIZE)
+                        {
+                            std::cout << "More than MAX_MEMORY_SIZE(" << MAX_MEMORY_SIZE << ") traced. Error!" << std::endl;
+                            exit(0);
+                        }
+
                         if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
                         {
                             fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
@@ -287,7 +301,7 @@ void EndInstruction()
     }
 }
 
-void BranchOrNot(UINT32 taken)
+void BranchOrNot(uint32_t taken)
 {
     curr_instr.has_mem_is_branch |= 0b00000001;
     if (taken != 0)
@@ -296,7 +310,7 @@ void BranchOrNot(UINT32 taken)
     }
 }
 
-void RegRead(UINT32 i, UINT32 index)
+void RegRead(uint32_t i, uint32_t index)
 {
     if (!tracing_on)
         return;
@@ -325,7 +339,7 @@ void RegRead(UINT32 i, UINT32 index)
     }
 }
 
-void RegWrite(REG i, UINT32 index)
+void RegWrite(REG i, uint32_t index)
 {
     if (!tracing_on)
         return;
@@ -354,7 +368,7 @@ void RegWrite(REG i, UINT32 index)
     }
 }
 
-void MemoryRead(VOID *addr, UINT32 index, UINT32 read_size)
+void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
 {
     if (!tracing_on)
         return;
@@ -387,7 +401,7 @@ void MemoryRead(VOID *addr, UINT32 index, UINT32 read_size)
                     if (debug)
                     {
                         std::cout << "Obtained memory from 0x" << std::hex << addr << "with value ";
-                        for (UINT32 j = 0; j < read_size; j++)
+                        for (uint32_t j = 0; j < read_size; j++)
                         {
                             std::cout << std::hex << (int)curr_instr.source_memory_value[i][j];
                         }
@@ -410,7 +424,7 @@ void MemoryRead(VOID *addr, UINT32 index, UINT32 read_size)
     }
 }
 
-void MemoryWriteCaptureAddress(VOID *addr, UINT32 index)
+void MemoryWriteCaptureAddress(VOID *addr, uint32_t index)
 {
     if (!tracing_on)
         return;
@@ -439,7 +453,7 @@ void MemoryWriteCaptureAddress(VOID *addr, UINT32 index)
     }
 }
 
-void MemoryWriteCaptureValue(UINT32 index, UINT32 write_size)
+void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
 {
     if (!tracing_on)
         return;
@@ -458,7 +472,7 @@ void MemoryWriteCaptureValue(UINT32 index, UINT32 write_size)
             if (debug)
             {
                 std::cout << "Obtained memory from " << std::hex << addr << "with value ";
-                for (UINT32 j = 0; j < write_size; j++)
+                for (uint32_t j = 0; j < write_size; j++)
                 {
                     std::cout << std::hex << (int)curr_instr.destination_memory_value[memoryWriteIndex][j];
                 }
@@ -517,10 +531,10 @@ void MemoryWriteValueForCall()
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID *v)
 {
-    UINT32 memOperands = INS_MemoryOperandCount(ins);
+    uint32_t memOperands = INS_MemoryOperandCount(ins);
 
     // begin each instruction with this function
-    UINT32 opcode = INS_Opcode(ins);
+    uint32_t opcode = INS_Opcode(ins);
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction,
                    IARG_INST_PTR,
                    IARG_UINT32, opcode,
@@ -535,10 +549,10 @@ VOID Instruction(INS ins, VOID *v)
                        IARG_END);
 
     // instrument register reads
-    UINT32 readRegCount = INS_MaxNumRRegs(ins);
-    for (UINT32 i = 0; i < readRegCount; i++)
+    uint32_t readRegCount = INS_MaxNumRRegs(ins);
+    for (uint32_t i = 0; i < readRegCount; i++)
     {
-        UINT32 regNum = INS_RegR(ins, i);
+        uint32_t regNum = INS_RegR(ins, i);
 
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)RegRead,
                        IARG_UINT32, regNum,
@@ -547,10 +561,10 @@ VOID Instruction(INS ins, VOID *v)
     }
 
     // instrument register writes
-    UINT32 writeRegCount = INS_MaxNumWRegs(ins);
-    for (UINT32 i = 0; i < writeRegCount; i++)
+    uint32_t writeRegCount = INS_MaxNumWRegs(ins);
+    for (uint32_t i = 0; i < writeRegCount; i++)
     {
-        UINT32 regNum = INS_RegW(ins, i);
+        uint32_t regNum = INS_RegW(ins, i);
 
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)RegWrite,
                        IARG_UINT32, regNum,
@@ -561,11 +575,11 @@ VOID Instruction(INS ins, VOID *v)
     // instrument memory reads and writes
 
     // Iterate over each memory operand of the instruction.
-    for (UINT32 memOp = 0; memOp < memOperands; memOp++)
+    for (uint32_t memOp = 0; memOp < memOperands; memOp++)
     {
         if (INS_MemoryOperandIsRead(ins, memOp))
         {
-            UINT32 read_size = INS_MemoryOperandSize(ins, memOp);
+            uint32_t read_size = INS_MemoryOperandSize(ins, memOp);
             if (read_size > MAX_MEMORY_SIZE)
             {
                 skip_curr_instr = true;
@@ -588,7 +602,7 @@ VOID Instruction(INS ins, VOID *v)
 
             if (INS_HasFallThrough(ins))
             {
-                UINT32 write_size = INS_MemoryOperandSize(ins, memOp);
+                uint32_t write_size = INS_MemoryOperandSize(ins, memOp);
                 if (write_size > MAX_MEMORY_SIZE)
                 {
                     skip_curr_instr = true;

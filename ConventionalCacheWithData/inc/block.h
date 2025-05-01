@@ -35,6 +35,7 @@ public:
     // replacement state
     uint32_t lru;
     unsigned char *data_value;
+    bool *data_valid;
 
     BLOCK()
     {
@@ -63,6 +64,12 @@ public:
         num_uses = 0;
 
         data_value = new unsigned char[BLOCK_SIZE];
+        data_valid = new bool[BLOCK_SIZE];
+        for (uint32_t i = 0; i < BLOCK_SIZE; i++)
+        {
+            data_value[i] = 0;
+            data_valid[i] = false;
+        }
     };
 };
 

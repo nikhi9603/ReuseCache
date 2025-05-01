@@ -5,6 +5,7 @@ TRACER="Tracers/DataTracer/obj-intel64/champsim_tracer.so"
 CONVENTIONAL_PROGRAM="ConventionalCacheWithData/bin/champsim"
 REUSE_PROGRAM="ReuseCacheWithData/bin/champsim"
 
+ONNX_RUNTIME_DIR="ONNX-Runtime-Inference"
 MODELS_DIR="ONNX-Runtime-Inference/data/models"
 
 OUTPUT_DIR="MLOutputs"

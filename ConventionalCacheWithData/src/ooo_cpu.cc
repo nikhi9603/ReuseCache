@@ -792,8 +792,8 @@ void O3_CPU::fetch_instruction()
             fetch_packet.address = IFETCH_BUFFER.entry[index].ip >> 6;
             fetch_packet.full_addr = IFETCH_BUFFER.entry[index].ip;
             fetch_packet.full_virtual_address = IFETCH_BUFFER.entry[index].ip;
-            fetch_packet.data_value = IFETCH_BUFFER.entry[index].destination_memory_value[0];
-            fetch_packet.data_size = IFETCH_BUFFER.entry[index].destination_memory_size[0];
+            fetch_packet.data_value = IFETCH_BUFFER.entry[index].source_memory_value[0];
+            fetch_packet.data_size = IFETCH_BUFFER.entry[index].source_memory_size[0];
             fetch_packet.block_offset = IFETCH_BUFFER.entry[index].ip & BLOCK_OFFSET_MASK;
             fetch_packet.instr_id = 0;
             // Neelu: Is assigning rob_index = 0 going to cause any problems?

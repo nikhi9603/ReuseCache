@@ -302,9 +302,11 @@ int main(int argc, char* argv[])
         memoryInfo, outputTensorValues.data(), outputTensorSize,
         outputDims.data(), outputDims.size()));
 
+    std::cout << "Running inference..." << std::endl;
     session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
                 inputTensors.data(), 1 /*Number of inputs*/, outputNames.data(),
                 outputTensors.data(), 1 /*Number of outputs*/);
+    std::cout << "Inference completed." << std::endl;
 
     std::vector<int> predIds(batchSize, 0);
     std::vector<std::string> predLabels(batchSize);
