@@ -415,6 +415,9 @@ void CACHE::handle_fill()
                     writeback_packet.ip = 0; // writeback does not have ip
                     writeback_packet.type = WRITEBACK;
                     writeback_packet.event_cycle = current_core_cycle[fill_cpu];
+                    writeback_packet.data_value = block[set][way].data_value;
+                    writeback_packet.data_size = BLOCK_SIZE;
+                    writeback_packet.block_offset = 0;
 
                     lower_level->add_wq(&writeback_packet);
                 }
@@ -810,6 +813,7 @@ void CACHE::handle_writeback()
 
             // mark dirty
             block[set][way].dirty = 1;
+            block[set][way].data_value = WQ.entry[index].data_value;
 
             if (cache_type == IS_ITLB)
                 WQ.entry[index].instruction_pa = block[set][way].data;
@@ -1010,6 +1014,9 @@ void CACHE::handle_writeback()
                             writeback_packet.ip = 0;
                             writeback_packet.type = WRITEBACK;
                             writeback_packet.event_cycle = current_core_cycle[writeback_cpu];
+                            writeback_packet.data_value = block[set][way].data_value;
+                            writeback_packet.data_size = BLOCK_SIZE;
+                            writeback_packet.block_offset = 0;
 
                             lower_level->add_wq(&writeback_packet);
                         }
@@ -2925,6 +2932,7 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     block[set][way].dirty = 0;
     block[set][way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
     block[set][way].used = 0;
+    memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, packet->data_size);
 
     // Neelu: Setting instruction and translation fields in L2C
     if (cache_type == IS_L2C)
@@ -4075,6 +4083,7 @@ void CACHE::return_data(PACKET *packet)
     // no need to do memcpy
     MSHR.num_returned++;
     MSHR.entry[mshr_index].returned = COMPLETED;
+    MSHR.entry[mshr_index].data_value = packet->data_value;
 #ifdef INS_PAGE_TABLE_WALKER
     if (cache_type == IS_STLB)
     {

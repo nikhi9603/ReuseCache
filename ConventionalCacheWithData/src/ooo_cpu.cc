@@ -792,6 +792,9 @@ void O3_CPU::fetch_instruction()
             fetch_packet.address = IFETCH_BUFFER.entry[index].ip >> 6;
             fetch_packet.full_addr = IFETCH_BUFFER.entry[index].ip;
             fetch_packet.full_virtual_address = IFETCH_BUFFER.entry[index].ip;
+            fetch_packet.data_value = IFETCH_BUFFER.entry[index].destination_memory_value[0];
+            fetch_packet.data_size = IFETCH_BUFFER.entry[index].destination_memory_size[0];
+            fetch_packet.block_offset = IFETCH_BUFFER.entry[index].ip & BLOCK_OFFSET_MASK;
             fetch_packet.instr_id = 0;
             // Neelu: Is assigning rob_index = 0 going to cause any problems?
             fetch_packet.rob_index = 0;
@@ -2226,6 +2229,9 @@ int O3_CPU::execute_load(uint32_t rob_index, uint32_t lq_index, uint32_t data_in
     data_packet.address = LQ.entry[lq_index].virtual_address >> LOG2_BLOCK_SIZE;
     data_packet.full_addr = LQ.entry[lq_index].virtual_address;
     data_packet.full_virtual_address = LQ.entry[lq_index].virtual_address;
+    data_packet.data_value = ROB.entry[rob_index].source_memory_value[data_index];
+    data_packet.data_size = ROB.entry[rob_index].source_memory_size[data_index];
+    data_packet.block_offset = LQ.entry[lq_index].virtual_address & BLOCK_OFFSET_MASK;
 
     data_packet.instr_id = LQ.entry[lq_index].instr_id;
     data_packet.rob_index = LQ.entry[lq_index].rob_index;
@@ -2880,6 +2886,9 @@ void O3_CPU::retire_rob()
                         data_packet.address = SQ.entry[sq_index].virtual_address >> LOG2_BLOCK_SIZE;
                         data_packet.full_addr = SQ.entry[sq_index].virtual_address;
                         data_packet.full_virtual_address = SQ.entry[sq_index].virtual_address;
+                        data_packet.data_value = ROB.entry[ROB.head].destination_memory_value[i];
+                        data_packet.data_size = ROB.entry[ROB.head].destination_memory_size[i];
+                        data_packet.block_offset = SQ.entry[sq_index].virtual_address & BLOCK_OFFSET_MASK;
 
                         data_packet.instr_id = SQ.entry[sq_index].instr_id;
                         data_packet.rob_index = SQ.entry[sq_index].rob_index;

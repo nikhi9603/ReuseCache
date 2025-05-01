@@ -34,6 +34,7 @@ public:
 
     // replacement state
     uint32_t lru;
+    unsigned char *data_value;
 
     BLOCK()
     {
@@ -60,6 +61,8 @@ public:
 
         lru = 0;
         num_uses = 0;
+
+        data_value = new unsigned char[BLOCK_SIZE];
     };
 };
 
@@ -150,6 +153,10 @@ public:
         event_cycle,
         cycle_enqueued;
 
+    unsigned char* data_value;
+    uint8_t data_size;
+    uint64_t block_offset;
+
     PACKET()
     {
         instruction = 0;
@@ -219,6 +226,10 @@ public:
         l1_pq_index = -1;
         full_physical_address = 0;
         send_both_tlb = false;
+
+        data_value = nullptr;
+        data_size = 0;
+        block_offset = 0;
     };
 };
 
