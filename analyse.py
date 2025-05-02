@@ -79,23 +79,65 @@ for trace in traces:
 
 print(f"Average % Unused Lines: {total_unused / len(traces):.2f}%")
 
-# Plotting the IPC and Hit Rate ratios in separate plots
+# Plotting the IPC ratio,  Hit Rate ratio, unused line % in separate plots
 ipc_ratios = [stats["ReuseCache"][trace]['IPC'] / stats["ConventionalCache"][trace]['IPC'] for trace in traces]
 hit_rate_ratios = [stats["ReuseCache"][trace]['HitRate'] / stats["ConventionalCache"][trace]['HitRate'] for trace in traces]
+unused_lines = [stats["ConventionalCache"][trace]['EvictionStats'].get(0, 0) / stats["ConventionalCache"][trace]['TotalLines'] * 100 for trace in traces]
 
 plt.figure(figsize=(30, 16))
 plt.bar(traces, ipc_ratios, color='blue')
-plt.title('IPC Ratios')
-plt.xlabel('Trace', fontsize=16)
-plt.ylabel('IPC Ratio', fontsize=16)
-plt.xticks(rotation=45, fontsize=12)
+plt.title('IPC Ratios', fontsize=20)
+plt.xlabel('Trace', fontsize=20)
+plt.ylabel('IPC Ratio', fontsize=20)
+plt.xticks(rotation=45, fontsize=20)
+plt.tight_layout()
 plt.savefig('ipc_ratios_spec.png')
 
 
 plt.figure(figsize=(30, 16))
 plt.bar(traces, hit_rate_ratios, color='green')
-plt.title('Hit Rate Ratios')
-plt.xlabel('Trace', fontsize=16)
-plt.ylabel('Hit Rate Ratio', fontsize=16)
-plt.xticks(rotation=45, fontsize=12)
+plt.title('Hit Rate Ratios', fontsize=20)
+plt.xlabel('Trace', fontsize=20)
+plt.ylabel('Hit Rate Ratio', fontsize=20)
+plt.xticks(rotation=45, fontsize=20)
+plt.tight_layout()
 plt.savefig('hit_rate_ratios_spec.png')
+
+# add the average line to the plot and write the average value on the plot
+plt.figure(figsize=(30, 16))
+plt.bar(traces, unused_lines, color='red')
+plt.axhline(y=total_unused / len(traces), color='r', linestyle='--', label='Average % Unused Lines')
+plt.text(-1, total_unused / len(traces) + 1, f'Average: {total_unused / len(traces):.2f}%', color='r', fontsize=20)
+plt.title('Unused Lines %', fontsize=20)
+plt.xlabel('Trace', fontsize=20)
+plt.ylabel('Unused Lines %', fontsize=20)
+plt.xticks(rotation=45, fontsize=20)
+plt.tight_layout()
+plt.savefig('unused_lines_spec.png')
+
+plt.figure(figsize=(30, 16))
+x = range(len(traces))
+width = 0.35
+plt.bar(x, [stats["ReuseCache"][trace]['IPC'] for trace in traces], width, label='Reuse IPC', color='blue')
+plt.bar([i + width for i in x], [stats["ConventionalCache"][trace]['IPC'] for trace in traces], width, label='Conventional IPC', color='orange')
+plt.title('IPC for Conventional and Reuse Cache', fontsize=20)
+plt.xlabel('Trace', fontsize=20)
+plt.ylabel('IPC', fontsize=20)
+plt.xticks([i + width / 2 for i in x], traces, rotation=45, fontsize=20)
+plt.legend()
+plt.tight_layout()
+plt.savefig('ipc_conv_reuse_spec.png')
+
+# plot a bar plot with conventianal ipc and reuse hit rate sied by side in a bar graph
+plt.figure(figsize=(30, 16))
+x = range(len(traces))
+width = 0.35
+plt.bar(x, [stats["ReuseCache"][trace]['HitRate'] for trace in traces], width, label='Reuse Hit Rate', color='blue')
+plt.bar([i + width for i in x], [stats["ConventionalCache"][trace]['HitRate'] for trace in traces], width, label='Conventional Hit Rate', color='orange')
+plt.title('Hit Rate for Conventional and Reuse Cache', fontsize=20)
+plt.xlabel('Trace', fontsize=20)
+plt.ylabel('Hit Rate', fontsize=20)
+plt.xticks([i + width / 2 for i in x], traces, rotation=45, fontsize=20)
+plt.legend()
+plt.tight_layout()
+plt.savefig('hit_rate_conv_reuse_spec.png')
