@@ -1,5 +1,6 @@
 import os
 import re
+import matplotlib.pyplot as plt
 
 def extract_filename_component(path):
     match = re.search(r'(\d+\.\w+-\w+)', path)
@@ -53,6 +54,8 @@ for trace in all_traces:
     path = os.path.join(reuse_cache_path, name + ".champsimtrace.out")
     extract_data(path, stats["ReuseCache"], name)
 
+total_unused = 0
+
 for trace in traces:
     for cache in ["ConventionalCache", "ReuseCache"]:
         print(f"Cache: {cache}, Trace: {trace}")
@@ -63,9 +66,36 @@ for trace in traces:
             print(f"Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0)}")
             print(f"% Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0) / stats[cache][trace]['TotalLines'] * 100:.2f}%")
             print(f"% Lines with Single Usage: {stats[cache][trace]['EvictionStats'].get(1, 0) / stats[cache][trace]['TotalLines'] * 100:.2f}%")
+            total_unused += stats[cache][trace]['EvictionStats'].get(0, 0) / stats[cache][trace]['TotalLines'] * 100
         else:
             print(f"TotalLines: {stats[cache][trace]['TotalLines']}")
             print(f"Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0)}")
             print(f"% Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0) / stats[cache][trace]['TotalLines'] * 100:.2f}%")
         print()
+
+    print("IPC Ratio: ", stats["ReuseCache"][trace]['IPC'] / stats["ConventionalCache"][trace]['IPC'])
+    print("Hit Rate Ratio: ", stats["ReuseCache"][trace]['HitRate'] / stats["ConventionalCache"][trace]['HitRate'])
     print("===============================================================================================")
+
+print(f"Average % Unused Lines: {total_unused / len(traces):.2f}%")
+
+# Plotting the IPC and Hit Rate ratios in separate plots
+ipc_ratios = [stats["ReuseCache"][trace]['IPC'] / stats["ConventionalCache"][trace]['IPC'] for trace in traces]
+hit_rate_ratios = [stats["ReuseCache"][trace]['HitRate'] / stats["ConventionalCache"][trace]['HitRate'] for trace in traces]
+
+plt.figure(figsize=(30, 16))
+plt.bar(traces, ipc_ratios, color='blue')
+plt.title('IPC Ratios')
+plt.xlabel('Trace', fontsize=16)
+plt.ylabel('IPC Ratio', fontsize=16)
+plt.xticks(rotation=45, fontsize=12)
+plt.savefig('ipc_ratios_spec.png')
+
+
+plt.figure(figsize=(30, 16))
+plt.bar(traces, hit_rate_ratios, color='green')
+plt.title('Hit Rate Ratios')
+plt.xlabel('Trace', fontsize=16)
+plt.ylabel('Hit Rate Ratio', fontsize=16)
+plt.xticks(rotation=45, fontsize=12)
+plt.savefig('hit_rate_ratios_spec.png')

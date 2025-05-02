@@ -13,6 +13,8 @@ TotalLines: 87798
 Lines with Zero Usage: 74293
 % Lines with Zero Usage: 84.62%
 
+IPC Ratio:  1.3217680654926152
+Hit Rate Ratio:  0.7920185429168717
 ===============================================================================================
 Cache: ConventionalCache, model: googlenet-12
 IPC: 0.75
@@ -29,6 +31,8 @@ TotalLines: 64738
 Lines with Zero Usage: 60994
 % Lines with Zero Usage: 94.22%
 
+IPC Ratio:  0.9814121198568873
+Hit Rate Ratio:  0.35747696207409857
 ===============================================================================================
 Cache: ConventionalCache, model: mobilenetv2-12
 IPC: 1.02
@@ -45,6 +49,8 @@ TotalLines: 82219
 Lines with Zero Usage: 74700
 % Lines with Zero Usage: 90.85%
 
+IPC Ratio:  0.976104463082959
+Hit Rate Ratio:  0.3507945485342621
 ===============================================================================================
 Cache: ConventionalCache, model: inception-v1-12
 IPC: 0.77
@@ -61,6 +67,8 @@ TotalLines: 79136
 Lines with Zero Usage: 73409
 % Lines with Zero Usage: 92.76%
 
+IPC Ratio:  0.9556777527494369
+Hit Rate Ratio:  0.381534886626937
 ===============================================================================================
 Cache: ConventionalCache, model: resnet50-v1-12
 IPC: 0.91
@@ -77,6 +85,8 @@ TotalLines: 41486
 Lines with Zero Usage: 39476
 % Lines with Zero Usage: 95.15%
 
+IPC Ratio:  0.8475032454145873
+Hit Rate Ratio:  0.029760195617875497
 ===============================================================================================
 Cache: ConventionalCache, model: densenet-12
 IPC: 0.64
@@ -93,6 +103,8 @@ TotalLines: 39233
 Lines with Zero Usage: 36949
 % Lines with Zero Usage: 94.18%
 
+IPC Ratio:  0.9154478016894891
+Hit Rate Ratio:  0.13281868491926105
 ===============================================================================================
 Cache: ConventionalCache, model: bvlcalexnet-12
 IPC: 0.94
@@ -109,6 +121,8 @@ TotalLines: 96625
 Lines with Zero Usage: 94443
 % Lines with Zero Usage: 97.74%
 
+IPC Ratio:  0.9118632425392755
+Hit Rate Ratio:  0.0570371988260187
 ===============================================================================================
 Cache: ConventionalCache, model: inception-v2-9
 IPC: 1.27
@@ -125,6 +139,8 @@ TotalLines: 94372
 Lines with Zero Usage: 74982
 % Lines with Zero Usage: 79.45%
 
+IPC Ratio:  0.9730184172480986
+Hit Rate Ratio:  0.8048350142238578
 ===============================================================================================
 Cache: ConventionalCache, model: caffenet-12
 IPC: 1.08
@@ -141,6 +157,8 @@ TotalLines: 96079
 Lines with Zero Usage: 93601
 % Lines with Zero Usage: 97.42%
 
+IPC Ratio:  0.7591709066644424
+Hit Rate Ratio:  0.07668192965792944
 ===============================================================================================
 Cache: ConventionalCache, model: vgg16-bn-7
 IPC: 0.11
@@ -157,6 +175,8 @@ TotalLines: 80035
 Lines with Zero Usage: 80005
 % Lines with Zero Usage: 99.96%
 
+IPC Ratio:  1.0850944853234867
+Hit Rate Ratio:  0.003936233214606516
 ===============================================================================================
 Cache: ConventionalCache, model: efficientnet-lite4-11
 IPC: 0.89
@@ -173,6 +193,8 @@ TotalLines: 61922
 Lines with Zero Usage: 58277
 % Lines with Zero Usage: 94.11%
 
+IPC Ratio:  0.997280573838332
+Hit Rate Ratio:  0.7290506841286515
 ===============================================================================================
 Cache: ConventionalCache, model: shufflenet-v2-12
 IPC: 0.47
@@ -189,4 +211,7 @@ TotalLines: 61458
 Lines with Zero Usage: 55608
 % Lines with Zero Usage: 90.48%
 
+IPC Ratio:  1.034344173228514
+Hit Rate Ratio:  1.0403187712192257
 ===============================================================================================
+Average % Unused Lines:  5.17001707166462

@@ -13,6 +13,8 @@ TotalLines: 95715
 Lines with Zero Usage: 93197
 % Lines with Zero Usage: 97.37%
 
+IPC Ratio:  0.993708656607795
+Hit Rate Ratio:  0.28013513761636344
 ===============================================================================================
 Cache: ConventionalCache, Trace: 444.namd-23B
 IPC: 1.15
@@ -29,6 +31,8 @@ TotalLines: 122341
 Lines with Zero Usage: 120803
 % Lines with Zero Usage: 98.74%
 
+IPC Ratio:  0.9999477502111761
+Hit Rate Ratio:  0.6056882536916606
 ===============================================================================================
 Cache: ConventionalCache, Trace: 403.gcc-17B
 IPC: 0.36
@@ -45,6 +49,8 @@ TotalLines: 52318
 Lines with Zero Usage: 51486
 % Lines with Zero Usage: 98.41%
 
+IPC Ratio:  0.7751894587051724
+Hit Rate Ratio:  0.13200746675303474
 ===============================================================================================
 Cache: ConventionalCache, Trace: 400.perlbench-50B
 IPC: 0.50
@@ -61,6 +67,8 @@ TotalLines: 60945
 Lines with Zero Usage: 54355
 % Lines with Zero Usage: 89.19%
 
+IPC Ratio:  1.0176614673185251
+Hit Rate Ratio:  1.1192823989368874
 ===============================================================================================
 Cache: ConventionalCache, Trace: 401.bzip2-7B
 IPC: 0.72
@@ -77,6 +85,8 @@ TotalLines: 251522
 Lines with Zero Usage: 208674
 % Lines with Zero Usage: 82.96%
 
+IPC Ratio:  1.0060969520787333
+Hit Rate Ratio:  0.982994912317043
 ===============================================================================================
 Cache: ConventionalCache, Trace: 625.x264_s-20B
 IPC: 0.77
@@ -93,6 +103,8 @@ TotalLines: 65798
 Lines with Zero Usage: 63992
 % Lines with Zero Usage: 97.26%
 
+IPC Ratio:  0.9900971199058799
+Hit Rate Ratio:  0.18050491716591915
 ===============================================================================================
 Cache: ConventionalCache, Trace: 458.sjeng-31B
 IPC: 0.53
@@ -109,6 +121,8 @@ TotalLines: 193913
 Lines with Zero Usage: 189996
 % Lines with Zero Usage: 97.98%
 
+IPC Ratio:  1.0031869880900381
+Hit Rate Ratio:  0.670072913181178
 ===============================================================================================
 Cache: ConventionalCache, Trace: 657.xz_s-56B
 IPC: 1.25
@@ -125,6 +139,8 @@ TotalLines: 4583
 Lines with Zero Usage: 4583
 % Lines with Zero Usage: 100.00%
 
+IPC Ratio:  1.0106170830541463
+Hit Rate Ratio:  0.8899967295871732
 ===============================================================================================
 Cache: ConventionalCache, Trace: 403.gcc-48B
 IPC: 0.70
@@ -141,6 +157,8 @@ TotalLines: 40414
 Lines with Zero Usage: 37919
 % Lines with Zero Usage: 93.83%
 
+IPC Ratio:  0.9960161868318322
+Hit Rate Ratio:  0.2676327848893248
 ===============================================================================================
 Cache: ConventionalCache, Trace: 444.namd-44B
 IPC: 1.01
@@ -157,6 +175,8 @@ TotalLines: 29337
 Lines with Zero Usage: 29288
 % Lines with Zero Usage: 99.83%
 
+IPC Ratio:  0.9999901422473706
+Hit Rate Ratio:  0.8752755944744086
 ===============================================================================================
 Cache: ConventionalCache, Trace: 625.x264_s-12B
 IPC: 1.17
@@ -173,6 +193,8 @@ TotalLines: 33366
 Lines with Zero Usage: 31396
 % Lines with Zero Usage: 94.10%
 
+IPC Ratio:  0.9845611995417942
+Hit Rate Ratio:  0.1353393580320984
 ===============================================================================================
 Cache: ConventionalCache, Trace: 625.x264_s-18B
 IPC: 0.84
@@ -189,6 +211,8 @@ TotalLines: 33140
 Lines with Zero Usage: 32973
 % Lines with Zero Usage: 99.50%
 
+IPC Ratio:  0.972969958181637
+Hit Rate Ratio:  0.09461831057040763
 ===============================================================================================
 Cache: ConventionalCache, Trace: 445.gobmk-30B
 IPC: 0.41
@@ -205,6 +229,8 @@ TotalLines: 976829
 Lines with Zero Usage: 930368
 % Lines with Zero Usage: 95.24%
 
+IPC Ratio:  1.0026205450733754
+Hit Rate Ratio:  0.8819011804747328
 ===============================================================================================
 Cache: ConventionalCache, Trace: 445.gobmk-17B
 IPC: 0.43
@@ -221,6 +247,8 @@ TotalLines: 1014371
 Lines with Zero Usage: 980015
 % Lines with Zero Usage: 96.61%
 
+IPC Ratio:  1.0013285660343934
+Hit Rate Ratio:  0.7715735052454501
 ===============================================================================================
 Cache: ConventionalCache, Trace: 625.x264_s-33B
 IPC: 0.96
@@ -237,6 +265,8 @@ TotalLines: 39244
 Lines with Zero Usage: 38710
 % Lines with Zero Usage: 98.64%
 
+IPC Ratio:  0.9870977046329545
+Hit Rate Ratio:  0.06562793654303245
 ===============================================================================================
 Cache: ConventionalCache, Trace: 464.h264ref-30B
 IPC: 0.84
@@ -253,6 +283,8 @@ TotalLines: 115343
 Lines with Zero Usage: 93286
 % Lines with Zero Usage: 80.88%
 
+IPC Ratio:  1.0005530728993084
+Hit Rate Ratio:  0.9031820731623525
 ===============================================================================================
 Cache: ConventionalCache, Trace: 445.gobmk-2B
 IPC: 0.43
@@ -269,6 +301,8 @@ TotalLines: 196746
 Lines with Zero Usage: 155392
 % Lines with Zero Usage: 78.98%
 
+IPC Ratio:  1.0016766029588764
+Hit Rate Ratio:  0.9502486381276778
 ===============================================================================================
 Cache: ConventionalCache, Trace: 433.milc-127B
 IPC: 0.43
@@ -285,6 +319,8 @@ TotalLines: 66663
 Lines with Zero Usage: 66657
 % Lines with Zero Usage: 99.99%
 
+IPC Ratio:  1.068891253615377
+Hit Rate Ratio:  0.13441681668014419
 ===============================================================================================
 Cache: ConventionalCache, Trace: 464.h264ref-57B
 IPC: 0.66
@@ -301,6 +337,8 @@ TotalLines: 85931
 Lines with Zero Usage: 74725
 % Lines with Zero Usage: 86.96%
 
+IPC Ratio:  0.999524269791887
+Hit Rate Ratio:  0.9104160813418618
 ===============================================================================================
 Cache: ConventionalCache, Trace: 403.gcc-16B
 IPC: 0.35
@@ -317,6 +355,8 @@ TotalLines: 172850
 Lines with Zero Usage: 125843
 % Lines with Zero Usage: 72.80%
 
+IPC Ratio:  0.9116268058619056
+Hit Rate Ratio:  0.7282845639963911
 ===============================================================================================
 Cache: ConventionalCache, Trace: 445.gobmk-36B
 IPC: 0.45
@@ -333,6 +373,8 @@ TotalLines: 243823
 Lines with Zero Usage: 223440
 % Lines with Zero Usage: 91.64%
 
+IPC Ratio:  0.9958071886965913
+Hit Rate Ratio:  0.6337458179146093
 ===============================================================================================
 Cache: ConventionalCache, Trace: 400.perlbench-41B
 IPC: 0.39
@@ -349,6 +391,8 @@ TotalLines: 58968
 Lines with Zero Usage: 55147
 % Lines with Zero Usage: 93.52%
 
+IPC Ratio:  1.0179590530542582
+Hit Rate Ratio:  1.1065612444544644
 ===============================================================================================
 Cache: ConventionalCache, Trace: 447.dealII-3B
 IPC: 0.56
@@ -365,6 +409,8 @@ TotalLines: 184094
 Lines with Zero Usage: 180976
 % Lines with Zero Usage: 98.31%
 
+IPC Ratio:  0.9857592607373118
+Hit Rate Ratio:  0.4718928998006112
 ===============================================================================================
 Cache: ConventionalCache, Trace: 464.h264ref-64B
 IPC: 0.62
@@ -381,4 +427,7 @@ TotalLines: 79674
 Lines with Zero Usage: 64910
 % Lines with Zero Usage: 81.47%
 
+IPC Ratio:  1.003033041202723
+Hit Rate Ratio:  0.9270897590152954
 ===============================================================================================
+Average % Unused Lines: 29.25%

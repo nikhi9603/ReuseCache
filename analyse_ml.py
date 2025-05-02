@@ -1,5 +1,6 @@
 import os
 import re
+import matplotlib.pyplot as plt
 
 def extract_filename_component(path):
     return ".".join((path.split('/')[-1].split('.'))[:-1])
@@ -50,6 +51,7 @@ for model in all_models:
     path = os.path.join(reuse_cache_path, name + ".out")
     extract_data(path, stats["ReuseCache"], name)
 
+total_unused = 0
 for model in models:
     for cache in ["ConventionalCache", "ReuseCache"]:
         print(f"Cache: {cache}, model: {model}")
@@ -60,9 +62,35 @@ for model in models:
             print(f"Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0)}")
             print(f"% Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
             print(f"% Lines with Single Usage: {stats[cache][model]['EvictionStats'].get(1, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
+            total_unused += stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100
         else:
             print(f"TotalLines: {stats[cache][model]['TotalLines']}")
             print(f"Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0)}")
             print(f"% Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
         print()
+
+    print("IPC Ratio: ", stats["ReuseCache"][model]['IPC'] / stats["ConventionalCache"][model]['IPC'])
+    print("Hit Rate Ratio: ", stats["ReuseCache"][model]['HitRate'] / stats["ConventionalCache"][model]['HitRate'])
     print("===============================================================================================")
+
+print("Average % Unused Lines: ", total_unused / len(models))
+
+ipc_ratios = [stats["ReuseCache"][model]['IPC'] / stats["ConventionalCache"][model]['IPC'] for model in models]
+hit_rate_ratios = [stats["ReuseCache"][model]['HitRate'] / stats["ConventionalCache"][model]['HitRate'] for model in models]
+
+plt.figure(figsize=(30, 16))
+plt.bar(models, ipc_ratios, color='blue')
+plt.title('IPC Ratios')
+plt.xlabel('model', fontsize=16)
+plt.ylabel('IPC Ratio', fontsize=16)
+plt.xticks(rotation=45, fontsize=12)
+plt.savefig('ipc_ratios_ml.png')
+
+
+plt.figure(figsize=(30, 16))
+plt.bar(models, hit_rate_ratios, color='green')
+plt.title('Hit Rate Ratios')
+plt.xlabel('model', fontsize=16)
+plt.ylabel('Hit Rate Ratio', fontsize=16)
+plt.xticks(rotation=45, fontsize=12)
+plt.savefig('hit_rate_ratios_ml.png')
