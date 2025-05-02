@@ -411,6 +411,7 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
                 else
                 {
                     delete curr_instr.source_memory_value[i];
+                    curr_instr.source_memory_address[i] = 0;
                     curr_instr.source_memory_value[i] = nullptr;
                     curr_instr.source_memory_size[i] = 0;
 
@@ -482,6 +483,7 @@ void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
         else
         {
             delete curr_instr.destination_memory_value[memoryWriteIndex];
+            curr_instr.destination_memory_address[memoryWriteIndex] = 0;
             curr_instr.destination_memory_size[memoryWriteIndex] = 0;
             curr_instr.destination_memory_value[memoryWriteIndex] = nullptr;
 

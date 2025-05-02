@@ -2944,34 +2944,29 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     block[set][way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
     block[set][way].used = 0;
     
-    // if(packet->data_size > BLOCK_SIZE)
-    // {
-    //     cout << "Data size is greater than block size" << endl;
-    //     assert(0);
-    // }
-    // if (packet->block_offset > BLOCK_SIZE)
-    // {
-    //     cout << "Block offset is greater than block size" << endl;
-    //     assert(0);
-    // }
-    // if (packet->data_size + packet->block_offset > BLOCK_SIZE)
-    // {
-    //     cout << "Data extends beyond block boundary. Unaligned access!" << endl;
-    //     assert(0);
-    // }
-
-    int data_size = packet->data_size;
-
+    if(packet->data_size > BLOCK_SIZE)
+    {
+        cout << "Data size is greater than block size" << endl;
+        assert(0);
+    }
+    if (packet->block_offset > BLOCK_SIZE)
+    {
+        cout << "Block offset is greater than block size" << endl;
+        assert(0);
+    }
     if (packet->data_size + packet->block_offset > BLOCK_SIZE)
     {
-        data_size = BLOCK_SIZE - packet->block_offset;
+        cout << "Data extends beyond block boundary. Unaligned access!" << endl;
+        assert(0);
     }
 
+
     memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, data_size);
-    for (int i = 0; i < packet->data_size; i++)
+    for (int i = 0; i < data_size; i++)
     {
         block[set][way].data_valid[i + packet->block_offset] = true;
     }
+    
 
     // Neelu: Setting instruction and translation fields in L2C
     if (cache_type == IS_L2C)
