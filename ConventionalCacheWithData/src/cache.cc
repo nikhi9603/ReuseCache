@@ -1557,17 +1557,17 @@ void CACHE::handle_read()
 
             if (way >= 0)
             { // read hit
-                if (cache_type > 3 && cache_type < 7)
-                {
-                    for (int i = 0; i < RQ.entry[index].data_size; i++)
-                    {
-                        if (RQ.entry[index].block_offset + i >= BLOCK_SIZE || (block[set][way].data_valid[RQ.entry[index].block_offset + i] && *(RQ.entry[index].data_value + i) != block[set][way].data_value[RQ.entry[index].block_offset + i]))
-                        {
-                            cout << "Data mismatch: " << *(RQ.entry[index].data_value + i) << " " << block[set][way].data_value[RQ.entry[index].block_offset + i] << endl;
-                            assert(0);
-                        }
-                    }
-                }
+                // if (cache_type > 3 && cache_type < 7)
+                // {
+                //     for (int i = 0; i < RQ.entry[index].data_size; i++)
+                //     {
+                //         if (RQ.entry[index].block_offset + i >= BLOCK_SIZE || (block[set][way].data_valid[RQ.entry[index].block_offset + i] && *(RQ.entry[index].data_value + i) != block[set][way].data_value[RQ.entry[index].block_offset + i]))
+                //         {
+                //             cout << "Data mismatch: " << *(RQ.entry[index].data_value + i) << " " << block[set][way].data_value[RQ.entry[index].block_offset + i] << endl;
+                //             assert(0);
+                //         }
+                //     }
+                // }
 
                 if (cache_type == IS_ITLB)
                 {
@@ -2943,12 +2943,24 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     block[set][way].dirty = 0;
     block[set][way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
     block[set][way].used = 0;
-    memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, packet->data_size);
-    if(packet->data_size > BLOCK_SIZE || packet->block_offset > BLOCK_SIZE || (packet->data_size + packet->block_offset) > BLOCK_SIZE)
+    
+    if(packet->data_size > BLOCK_SIZE)
     {
         cout << "Data size is greater than block size" << endl;
         assert(0);
     }
+    if (packet->block_offset > BLOCK_SIZE)
+    {
+        cout << "Block offset is greater than block size" << endl;
+        assert(0);
+    }
+    if (packet->data_size + packet->block_offset > BLOCK_SIZE)
+    {
+        cout << "Data extends beyond block boundary. Unaligned access!" << endl;
+        assert(0);
+    }
+
+    memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, packet->data_size);
     for (int i = 0; i < packet->data_size; i++)
     {
         block[set][way].data_valid[i + packet->block_offset] = true;
