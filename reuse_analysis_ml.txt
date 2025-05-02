@@ -1,0 +1,192 @@
+Cache: ConventionalCache, model: squeezenet1.1-7
+IPC: 0.61
+HitRate: 87.9689
+TotalLines: 650960
+Lines with Zero Usage: 5884
+% Lines with Zero Usage: 0.90%
+% Lines with Single Usage: 4.51%
+
+Cache: ReuseCache, model: squeezenet1.1-7
+IPC: 0.81
+HitRate: 69.673
+TotalLines: 87798
+Lines with Zero Usage: 74293
+% Lines with Zero Usage: 84.62%
+
+===============================================================================================
+Cache: ConventionalCache, model: googlenet-12
+IPC: 0.75
+HitRate: 73.6937
+TotalLines: 961532
+Lines with Zero Usage: 20792
+% Lines with Zero Usage: 2.16%
+% Lines with Single Usage: 4.46%
+
+Cache: ReuseCache, model: googlenet-12
+IPC: 0.74
+HitRate: 26.3438
+TotalLines: 64738
+Lines with Zero Usage: 60994
+% Lines with Zero Usage: 94.22%
+
+===============================================================================================
+Cache: ConventionalCache, model: mobilenetv2-12
+IPC: 1.02
+HitRate: 69.3098
+TotalLines: 1406626
+Lines with Zero Usage: 181872
+% Lines with Zero Usage: 12.93%
+% Lines with Single Usage: 10.47%
+
+Cache: ReuseCache, model: mobilenetv2-12
+IPC: 0.99
+HitRate: 24.313499999999998
+TotalLines: 82219
+Lines with Zero Usage: 74700
+% Lines with Zero Usage: 90.85%
+
+===============================================================================================
+Cache: ConventionalCache, model: inception-v1-12
+IPC: 0.77
+HitRate: 75.2251
+TotalLines: 913360
+Lines with Zero Usage: 12142
+% Lines with Zero Usage: 1.33%
+% Lines with Single Usage: 4.38%
+
+Cache: ReuseCache, model: inception-v1-12
+IPC: 0.74
+HitRate: 28.701
+TotalLines: 79136
+Lines with Zero Usage: 73409
+% Lines with Zero Usage: 92.76%
+
+===============================================================================================
+Cache: ConventionalCache, model: resnet50-v1-12
+IPC: 0.91
+HitRate: 59.1357
+TotalLines: 1854349
+Lines with Zero Usage: 73408
+% Lines with Zero Usage: 3.96%
+% Lines with Single Usage: 5.42%
+
+Cache: ReuseCache, model: resnet50-v1-12
+IPC: 0.77
+HitRate: 1.75989
+TotalLines: 41486
+Lines with Zero Usage: 39476
+% Lines with Zero Usage: 95.15%
+
+===============================================================================================
+Cache: ConventionalCache, model: densenet-12
+IPC: 0.64
+HitRate: 79.1997
+TotalLines: 1659384
+Lines with Zero Usage: 56060
+% Lines with Zero Usage: 3.38%
+% Lines with Single Usage: 1.69%
+
+Cache: ReuseCache, model: densenet-12
+IPC: 0.59
+HitRate: 10.5192
+TotalLines: 39233
+Lines with Zero Usage: 36949
+% Lines with Zero Usage: 94.18%
+
+===============================================================================================
+Cache: ConventionalCache, model: bvlcalexnet-12
+IPC: 0.94
+HitRate: 36.6275
+TotalLines: 4233351
+Lines with Zero Usage: 100121
+% Lines with Zero Usage: 2.37%
+% Lines with Single Usage: 0.60%
+
+Cache: ReuseCache, model: bvlcalexnet-12
+IPC: 0.85
+HitRate: 2.08913
+TotalLines: 96625
+Lines with Zero Usage: 94443
+% Lines with Zero Usage: 97.74%
+
+===============================================================================================
+Cache: ConventionalCache, model: inception-v2-9
+IPC: 1.27
+HitRate: 82.0101
+TotalLines: 575319
+Lines with Zero Usage: 11202
+% Lines with Zero Usage: 1.95%
+% Lines with Single Usage: 0.31%
+
+Cache: ReuseCache, model: inception-v2-9
+IPC: 1.24
+HitRate: 66.0046
+TotalLines: 94372
+Lines with Zero Usage: 74982
+% Lines with Zero Usage: 79.45%
+
+===============================================================================================
+Cache: ConventionalCache, model: caffenet-12
+IPC: 1.08
+HitRate: 35.2705
+TotalLines: 4242904
+Lines with Zero Usage: 96431
+% Lines with Zero Usage: 2.27%
+% Lines with Single Usage: 0.68%
+
+Cache: ReuseCache, model: caffenet-12
+IPC: 0.82
+HitRate: 2.70461
+TotalLines: 96079
+Lines with Zero Usage: 93601
+% Lines with Zero Usage: 97.42%
+
+===============================================================================================
+Cache: ConventionalCache, model: vgg16-bn-7
+IPC: 0.11
+HitRate: 35.2911
+TotalLines: 22927285
+Lines with Zero Usage: 1144913
+% Lines with Zero Usage: 4.99%
+% Lines with Single Usage: 10.14%
+
+Cache: ReuseCache, model: vgg16-bn-7
+IPC: 0.12
+HitRate: 0.138914
+TotalLines: 80035
+Lines with Zero Usage: 80005
+% Lines with Zero Usage: 99.96%
+
+===============================================================================================
+Cache: ConventionalCache, model: efficientnet-lite4-11
+IPC: 0.89
+HitRate: 77.9751
+TotalLines: 379837
+Lines with Zero Usage: 3017
+% Lines with Zero Usage: 0.79%
+% Lines with Single Usage: 11.91%
+
+Cache: ReuseCache, model: efficientnet-lite4-11
+IPC: 0.89
+HitRate: 56.84780000000001
+TotalLines: 61922
+Lines with Zero Usage: 58277
+% Lines with Zero Usage: 94.11%
+
+===============================================================================================
+Cache: ConventionalCache, model: shufflenet-v2-12
+IPC: 0.47
+HitRate: 83.6211
+TotalLines: 886036
+Lines with Zero Usage: 221553
+% Lines with Zero Usage: 25.00%
+% Lines with Single Usage: 5.10%
+
+Cache: ReuseCache, model: shufflenet-v2-12
+IPC: 0.49
+HitRate: 86.9926
+TotalLines: 61458
+Lines with Zero Usage: 55608
+% Lines with Zero Usage: 90.48%
+
+===============================================================================================

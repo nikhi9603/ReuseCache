@@ -2,10 +2,7 @@ import os
 import re
 
 def extract_filename_component(path):
-    match = re.search(r'(\d+\.\w+-\w+)', path)
-    if match:
-        return match.group(1)
-    return None
+    return ".".join((path.split('/')[-1].split('.'))[:-1])
 
 def extract_data(path, stats, name):
     stats[name] = {'IPC' : None, 'HitRate': None, 'EvictionStats' : {}, 'TotalLines' : None}
@@ -34,38 +31,38 @@ def extract_data(path, stats, name):
                 stats[name]['TotalLines'] = total_lines
 
 
-trace_path = "traces/"
-conventional_cache_path = "ConventionalCache/cache_output/"
-reuse_cache_path = "ReuseCache/reuse_cache_output/"
+model_path = "ONNX-Runtime-Inference/data/models"
+conventional_cache_path = "MLOutputs_Normal/conventional_output/"
+reuse_cache_path = "MLOutputs_Normal/reuse_cache_output/"
 
 stats = {"ConventionalCache": {}, "ReuseCache" : {}}
 
-all_traces = os.listdir(trace_path)
-traces = []
+all_models = os.listdir(model_path)
+models = []
 
-for trace in all_traces:
-    name = extract_filename_component(trace)
-    traces.append(name)
+for model in all_models:
+    name = extract_filename_component(model)
+    models.append(name)
 
-    path = os.path.join(conventional_cache_path, name + ".champsimtrace.out")
+    path = os.path.join(conventional_cache_path, name + ".out")
     extract_data(path, stats["ConventionalCache"], name)
 
-    path = os.path.join(reuse_cache_path, name + ".champsimtrace.out")
+    path = os.path.join(reuse_cache_path, name + ".out")
     extract_data(path, stats["ReuseCache"], name)
 
-for trace in traces:
+for model in models:
     for cache in ["ConventionalCache", "ReuseCache"]:
-        print(f"Cache: {cache}, Trace: {trace}")
-        print(f"IPC: {stats[cache][trace]['IPC']:.2f}")
-        print(f"HitRate: {stats[cache][trace]['HitRate']}")
+        print(f"Cache: {cache}, model: {model}")
+        print(f"IPC: {stats[cache][model]['IPC']:.2f}")
+        print(f"HitRate: {stats[cache][model]['HitRate']}")
         if cache == "ConventionalCache":
-            print(f"TotalLines: {stats[cache][trace]['TotalLines']}")
-            print(f"Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0)}")
-            print(f"% Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0) / stats[cache][trace]['TotalLines'] * 100:.2f}%")
-            print(f"% Lines with Single Usage: {stats[cache][trace]['EvictionStats'].get(1, 0) / stats[cache][trace]['TotalLines'] * 100:.2f}%")
+            print(f"TotalLines: {stats[cache][model]['TotalLines']}")
+            print(f"Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0)}")
+            print(f"% Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
+            print(f"% Lines with Single Usage: {stats[cache][model]['EvictionStats'].get(1, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
         else:
-            print(f"TotalLines: {stats[cache][trace]['TotalLines']}")
-            print(f"Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0)}")
-            print(f"% Lines with Zero Usage: {stats[cache][trace]['EvictionStats'].get(0, 0) / stats[cache][trace]['TotalLines'] * 100:.2f}%")
+            print(f"TotalLines: {stats[cache][model]['TotalLines']}")
+            print(f"Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0)}")
+            print(f"% Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
         print()
     print("===============================================================================================")
