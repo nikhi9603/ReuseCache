@@ -48,7 +48,8 @@ generate_trace_and_run() {
     $CONVENTIONAL_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output/${model_name}.out" 2>&1
     $REUSE_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
 
-    rm "$model_name.champsim.trace"
+    rm "$model_name.champsim.normal.trace"
+    rm "$model_name.champsim.data.trace"
     
     echo "Simulation for $model_name completed"
 }
