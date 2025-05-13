@@ -5,7 +5,7 @@
 *.trace
 *.gz
 *.xz
-*.out
+*.out*
 ConventionalCache/obj/*
 ConventionalCacheWithData/obj/*
 ReuseCache/obj/*
