@@ -104,6 +104,7 @@ RUN cd /tmp && \
     git clone --recursive --branch v${ONNXRUNTIME_VERSION} https://github.com/Microsoft/onnxruntime
 RUN cd /tmp && \
     cd onnxruntime && \
+    sed -i 's/SHA1=${DEP_SHA1_eigen}/SHA1=51982be81bbe52572b54180454df11a3ece9a934/' cmake/external/eigen.cmake && \
     ./build.sh \
         --allow_running_as_root \
         --cuda_home /usr/local/cuda \
@@ -119,6 +120,5 @@ RUN cd /tmp && \
         --skip_tests \
         --parallel ${NUM_JOBS} && \
     cd build/Linux/RelWithDebInfo && \
-    make install && \
     # pip install dist/* && \
     rm -rf /tmp/*

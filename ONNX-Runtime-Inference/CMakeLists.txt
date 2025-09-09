@@ -5,8 +5,8 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 find_package(OpenCV REQUIRED HINTS /usr/lib/x86_64-linux-gnu/cmake/opencv4/)
-find_path(ONNX_RUNTIME_SESSION_INCLUDE_DIRS onnxruntime_cxx_api.h HINTS ~/BTP/onnxruntime-linux-x64-1.12.0/include)
+find_path(ONNX_RUNTIME_SESSION_INCLUDE_DIRS onnxruntime_cxx_api.h HINTS ~/usr/local/onnxruntime-linux-x64-1.12.0/include)
 
-find_library(ONNX_RUNTIME_LIB onnxruntime HINTS ~/BTP/onnxruntime-linux-x64-1.12.0/lib)
+find_library(ONNX_RUNTIME_LIB onnxruntime HINTS ~/usr/local/onnxruntime-linux-x64-1.12.0/lib)
 
 add_subdirectory(src)

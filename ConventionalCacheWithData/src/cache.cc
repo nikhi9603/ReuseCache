@@ -2961,8 +2961,8 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     }
 
 
-    memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, data_size);
-    for (int i = 0; i < data_size; i++)
+    memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, packet->data_size);
+    for (int i = 0; i < packet->data_size; i++)
     {
         block[set][way].data_valid[i + packet->block_offset] = true;
     }

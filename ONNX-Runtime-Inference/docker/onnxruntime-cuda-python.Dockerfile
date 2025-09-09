@@ -37,4 +37,4 @@ ENV PATH=${PYTHON_VENV_PATH}/bin:$PATH
 RUN cd ${PYTHON_VENV_PATH}/bin && \
     pip install --upgrade pip setuptools wheel
 
-RUN pip install Pillow==11.2.0 onnx==${ONNX_VERSION} onnxruntime-gpu==${ONNXRUNTIME_VERSION}
+RUN pip install Pillow==11.2.1 onnx==${ONNX_VERSION} onnxruntime-gpu==${ONNXRUNTIME_VERSION}
