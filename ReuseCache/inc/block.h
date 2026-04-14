@@ -68,7 +68,8 @@ public:
         num_uses = 0;
 
         hasData = false;
-        nrr = -1;
+        nrr = 1;
+        nru = 1;
         forward_backward_pointer = nullptr;
     };
 };

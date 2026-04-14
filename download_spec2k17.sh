@@ -7,7 +7,7 @@ TRACES=(
     400.perlbench-41B.champsimtrace.xz
     400.perlbench-50B.champsimtrace.xz
     401.bzip2-7B.champsimtrace.xz
-    403.gcc-16B.champsimtrace.xz
+    
     403.gcc-17B.champsimtrace.xz
     403.gcc-48B.champsimtrace.xz
     433.milc-127B.champsimtrace.xz

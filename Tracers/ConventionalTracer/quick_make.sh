@@ -1,1 +1,1 @@
-make PIN_ROOT=~/BTP/pin-3.22-98547-g7a303a835-gcc-linux obj-intel64/champsim_tracer.so
+make PIN_ROOT=../../Tools/pin-3.20-98437-gf02b61307-gcc-linux obj-intel64/champsim_tracer.so

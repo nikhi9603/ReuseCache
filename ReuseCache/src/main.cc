@@ -472,7 +472,95 @@ void reset_cache_stats(uint32_t cpu, CACHE *cache)
     cache->PQ.MERGED = 0;
     cache->PQ.TO_CACHE = 0;
     cache->PQ.FORWARD = 0;
-    cache->PQ.FULL = 0;
+    cache->PQ.FULL = 0;    
+}
+
+void print_reuse_cache_warmup_statistics(uint32_t cpu, REUSE_CACHE_LLC* cache)
+{
+    int i = cpu;
+
+    // for (uint32_t i = 0; i < NUM_CPUS; i++)
+    // {
+    if(i == 0)
+    {
+        std::cout << "REUSE CACHE LLC REPLACEMENT WARMUP STATS" << std::endl;
+
+        std::cout << "CPU: " << i << std::endl;
+        int TOTAL_ACCESS = 0, TOTAL_TAG_MISS = 0, TOTAL_TAG_HIT = 0, TOTAL_DATA_MISS = 0, TOTAL_DATA_HIT = 0;
+        int TOTAL_MISS = 0, TOTAL_HIT = 0;
+        for (uint32_t j = 0; j < NUM_TYPES; j++)
+        {
+            TOTAL_ACCESS += cache->ACCESS[j];
+            TOTAL_MISS += cache->MISS[j];
+            TOTAL_HIT += cache->HIT[j];
+            TOTAL_TAG_MISS += cache->sim_llc_tag_miss[i][j];
+            TOTAL_TAG_HIT += cache->sim_llc_tag_hit[i][j];
+            TOTAL_DATA_MISS += cache->sim_llc_data_miss[i][j];
+            TOTAL_DATA_HIT += cache->sim_llc_data_hit[i][j];
+        }
+        std::cout << "WARMUP TOTAL_ACCESS: " << TOTAL_ACCESS << "WARMUP TOTAL_MISS: " << TOTAL_MISS << "WARMUP TOTAL_HIT: " << TOTAL_HIT << std::endl;
+        std::cout << "WARMUP TAG_MISS: " << TOTAL_TAG_MISS << " WARMUP TAG_HIT: " << TOTAL_TAG_HIT << std::endl;
+        std::cout << "WARMUP DATA_MISS: " << TOTAL_DATA_MISS << " WARMUP DATA_HIT: " << TOTAL_DATA_HIT << std::endl;
+        std::cout << "WARMUP MISSRATE: " << (double)TOTAL_MISS / TOTAL_ACCESS << std::endl;
+        std::cout << "WARMUP HITRATE: " << (double)TOTAL_HIT / TOTAL_ACCESS << std::endl;
+
+        cout << "LLC WARMUP LOAD      ACCESS: " << setw(10) << cache->ACCESS[0] << "  HIT: " << setw(10) << cache->HIT[0] << "  MISS: " << setw(10) << cache->MISS[0] << "  HIT %: " << setw(10) << ((double)cache->HIT[0] * 100 / cache->ACCESS[0]) << "  MISS %: " << setw(10) << ((double)cache->MISS[0] * 100 / cache->ACCESS[0]) << endl; 
+        cout << "LLC WARMUP RFO      ACCESS: " << setw(10) << cache->ACCESS[1] << "  HIT: " << setw(10) << cache->HIT[1] << "  MISS: " << setw(10) << cache->MISS[1] << "  HIT %: " << setw(10) << ((double)cache->HIT[1] * 100 / cache->ACCESS[1]) << "  MISS %: " << setw(10) << ((double)cache->MISS[1] * 100 / cache->ACCESS[1]) << endl; 
+        cout << "LLC WARMUP PREFETCH      ACCESS: " << setw(10) << cache->ACCESS[2] << "  HIT: " << setw(10) << cache->HIT[2] << "  MISS: " << setw(10) << cache->MISS[2] << "  HIT %: " << setw(10) << ((double)cache->HIT[2] * 100 / cache->ACCESS[2]) << "  MISS %: " << setw(10) << ((double)cache->MISS[2] * 100 /cache->ACCESS[2]) << endl; 
+        cout << "LLC WARMUP WRITEBACK      ACCESS: " << setw(10) << cache->ACCESS[3] << "  HIT: " << setw(10) << cache->HIT[3] << "  MISS: " << setw(10) << cache->MISS[3] << "  HIT %: " << setw(10) << ((double)cache->HIT[3] * 100 / cache->ACCESS[3]) << "  MISS %: " << setw(10) << ((double)cache->MISS[3] * 100 / cache->ACCESS[3]) << endl; 
+        cout << "LLC WARMUP LOAD TRANSLATION ACCESS: " << setw(10) << cache->ACCESS[4] << "  HIT: " << setw(10) << cache->HIT[4] << "  MISS: " << setw(10) << cache->MISS[4] << "  HIT %: " << setw(10) << ((double)cache->HIT[4] * 100 / cache->ACCESS[4]) << "  MISS %: " << setw(10) << ((double)cache->MISS[4] * 100 / cache->ACCESS[4]) << endl; 
+        cout << "LLC WARMUP PREFETCH TRANSLATION ACCESS: " << setw(10) << cache->ACCESS[5] << "  HIT: " << setw(10) << cache->HIT[5] << "  MISS: " << setw(10) << cache->MISS[5] << "  HIT %: " << setw(10) << ((double)cache->HIT[5] * 100 / cache->ACCESS[5]) << "  MISS %: " << setw(10) << ((double)cache->MISS[5] * 100 / cache->ACCESS[5]) << endl; 
+        cout << "LLC WARMUP TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->ACCESS[6] << "  HIT: " << setw(10) << cache->HIT[6] << "  MISS: " << setw(10) << cache->MISS[6] << "  HIT %: " << setw(10) << ((double)cache->HIT[6] * 100 / cache->ACCESS[6]) << "  MISS %: " << setw(10) << ((double)cache->MISS[6] * 100 / cache->ACCESS[6]) << endl; 
+        
+        std::cout << "In Reuse Cache by the end of warmup:" << std::endl;
+
+        for(int i = 0; i < cache->NUM_DATA_ARRAY_SETS; i++)
+        {
+            for(int j = 0; j < cache->NUM_DATA_ARRAY_WAYS; j++)
+            {
+                if(cache->data_array[i][j].valid == 1)
+                {
+                    cache->num_uses_before_eviction[cache->data_array[i][j].num_uses]++;
+                }
+            }
+        }
+
+        int totalLines = 0;
+        for (auto &use : cache->num_uses_before_eviction)
+        {
+            totalLines += use.second;
+            std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
+        }
+        std::cout << "Total number of lines: " << totalLines << std::endl;
+    }
+}
+
+void reset_reuse_cache_stats(uint32_t cpu, CACHE* cache)
+{
+    REUSE_CACHE_LLC* reuseCache  = dynamic_cast<REUSE_CACHE_LLC*>(cache);
+    print_reuse_cache_warmup_statistics(cpu,reuseCache);        // TODO: for now, its written for single core,cpu = 0;
+    reset_cache_stats(cpu, cache);
+    
+    for (uint32_t i = 0; i < NUM_TYPES; i++)
+    {
+        reuseCache->sim_llc_tag_hit[cpu][i] = 0;
+        reuseCache->sim_llc_tag_miss[cpu][i] = 0;
+        reuseCache->sim_llc_data_hit[cpu][i] = 0;
+        reuseCache->sim_llc_data_miss[cpu][i] = 0;
+    }
+
+    for(auto &num_uses: reuseCache->num_uses_before_eviction)
+    {
+        num_uses.second = 0;
+    }
+
+    for(int i = 0; i < reuseCache->NUM_DATA_ARRAY_SETS; i++)
+    {
+        for(int j = 0; j < reuseCache->NUM_DATA_ARRAY_WAYS; j++)
+        {
+            reuseCache->data_array[i][j].num_uses = 0;
+        }
+    }
 }
 
 void finish_warmup()
@@ -525,7 +613,8 @@ void finish_warmup()
         reset_cache_stats(i, &ooo_cpu[i].L1I);
         reset_cache_stats(i, &ooo_cpu[i].L1D);
         reset_cache_stats(i, &ooo_cpu[i].L2C);
-        reset_cache_stats(i, uncore.LLC);
+        // reset_cache_stats(i, uncore.LLC);
+        reset_reuse_cache_stats(i, uncore.LLC);
         reset_cache_stats(i, &ooo_cpu[i].BTB);
 
         //@Vishal: Reset MMU cache stats
@@ -1111,8 +1200,20 @@ int main(int argc, char **argv)
     cout << "Simulation Instructions: " << simulation_instructions << endl;
     // cout << "Scramble Loads: " << (knob_scramble_loads ? "ture" : "false") << endl;
     cout << "Number of CPUs: " << NUM_CPUS << endl;
-    cout << "LLC sets: " << LLC_SET << endl;
-    cout << "LLC ways: " << LLC_WAY << endl;
+
+    if (use_reuse_cache_llc)
+    {
+        cout << "LLC TAG ARRAY sets: " << REUSE_CACHE_TAG_ARRAY_SET << endl;
+        cout << "LLC TAG ARRAY ways: " << REUSE_CACHE_TAG_ARRAY_WAYS << endl;
+        cout << "LLC DATA ARRAY sets: " << REUSE_CACHE_DATA_ARRAY_SET << endl;
+        cout << "LLC DATA ARRAY ways: " << REUSE_CACHE_DATA_ARRAY_WAYS << endl;
+    }
+    else
+    {
+        cout << "LLC sets: " << LLC_SET << endl;
+        cout << "LLC ways: " << LLC_WAY << endl;
+    }
+
 #ifdef CAPTURE_DYNAMIC_ENERGY_PROFILE
     cout << "PHASE_SIZE_IN_CYCLES: " << PHASE_SIZE_IN_CYCLES << endl;
 #endif
@@ -1420,7 +1521,7 @@ int main(int argc, char **argv)
         uncore.LLC->upper_level_dcache[i] = &ooo_cpu[i].L2C;
         uncore.LLC->lower_level = &uncore.DRAM;
 
-#ifndef USE_REUSE_CACHE_LLC
+#ifndef USE_REUSE_CACHE_LLC         // TODO: switch has use_reuse_cache_llc var but again this macro defines whether to use or not. Use single var or macro to decide usage of reuse cache
         uncore.LLC->initialize_replacement = &CACHE::llc_initialize_replacement;
         uncore.LLC->update_replacement_state = &CACHE::llc_update_replacement_state;
         uncore.LLC->find_victim = &CACHE::llc_find_victim;

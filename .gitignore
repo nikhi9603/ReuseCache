@@ -21,3 +21,6 @@ ConventionalCache/cache_output/*
 ConventionalCacheWithData/cache_output/*
 ONNX-Runtime-Inference/build
 ONNX-Runtime-Inference/data/models
+ONNX-Runtime-Inference/data/models/models_list
+Tools/
+prev_graphs/

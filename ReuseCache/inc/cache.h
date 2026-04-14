@@ -99,13 +99,13 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define L2C_LATENCY 7 // 5 (L1I or L1D) + 10 = 15 cycles
 
 // LAST LEVEL CACHE
-#define LLC_SET NUM_CPUS * 8192
+#define LLC_SET NUM_CPUS * 4096
 #define LLC_WAY 16
 #define LLC_RQ_SIZE NUM_CPUS *L2C_MSHR_SIZE // 48
 #define LLC_WQ_SIZE NUM_CPUS *L2C_MSHR_SIZE // 48
 #define LLC_PQ_SIZE NUM_CPUS * 32           // Neelu: Changed from 32 per core to 64
 #define LLC_MSHR_SIZE NUM_CPUS * 64
-#define LLC_LATENCY 10 // 5 (L1I or L1D) + 10 + 20 = 35 cycles
+#define LLC_LATENCY 20 // 5 (L1I or L1D) + 10 + 20 = 35 cycles
 
 class CACHE : public MEMORY
 {
@@ -323,11 +323,11 @@ public:
 
     virtual void handle_fill(),
         handle_writeback(),
-        handle_read();
+        handle_read(),
+        handle_prefetch();
     void handle_processed();
 
-    void handle_prefetch(),
-        flush_TLB();
+    void flush_TLB();
 
     virtual void lru_update(uint32_t set, uint32_t way);
     void fill_cache(uint32_t set, uint32_t way, PACKET *packet);
@@ -365,7 +365,7 @@ public:
         (CACHE::*replacement_final_stats)(),
 
         base_replacement_final_stats(),
-        btb_replacement_final_stats(),
+        btb_replacement_final_stats(),     
         l1i_replacement_final_stats(),
         l1d_replacement_final_stats(),
         l2c_replacement_final_stats(),

@@ -34,11 +34,14 @@ def extract_data(path, stats, name):
 
 model_path = "ONNX-Runtime-Inference/data/models"
 conventional_cache_path = "MLOutputs_Normal/conventional_output/"
-reuse_cache_path = "MLOutputs_Normal/reuse_cache_output/"
+reuse_cache_path = "/scratch/nikhitha/OutputsTemp/80_200_simulations/mlworkloads/rc_8mb_4mb/"
 
 stats = {"ConventionalCache": {}, "ReuseCache" : {}}
 
 all_models = os.listdir(model_path)
+all_models.remove("vgg16-bn-7.onnx")
+all_models.remove("squeezenet1.1-7.onnx")
+all_models.remove("bvlcalexnet-12.onnx")
 models = []
 
 for model in all_models:
@@ -51,7 +54,9 @@ for model in all_models:
     path = os.path.join(reuse_cache_path, name + ".out")
     extract_data(path, stats["ReuseCache"], name)
 
-total_unused = 0
+total_unused_conventional = 0
+total_unused_reuse = 0
+
 for model in models:
     for cache in ["ConventionalCache", "ReuseCache"]:
         print(f"Cache: {cache}, model: {model}")
@@ -62,22 +67,25 @@ for model in models:
             print(f"Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0)}")
             print(f"% Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
             print(f"% Lines with Single Usage: {stats[cache][model]['EvictionStats'].get(1, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
-            total_unused += stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100
+            total_unused_conventional += stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100
         else:
             print(f"TotalLines: {stats[cache][model]['TotalLines']}")
             print(f"Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0)}")
             print(f"% Lines with Zero Usage: {stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100:.2f}%")
+            total_unused_reuse += stats[cache][model]['EvictionStats'].get(0, 0) / stats[cache][model]['TotalLines'] * 100
         print()
 
     print("IPC Ratio: ", stats["ReuseCache"][model]['IPC'] / stats["ConventionalCache"][model]['IPC'])
     print("Hit Rate Ratio: ", stats["ReuseCache"][model]['HitRate'] / stats["ConventionalCache"][model]['HitRate'])
     print("===============================================================================================")
 
-print("Average % Unused Lines: ", total_unused / len(models))
+print(f"Average % Unused Lines in conventional cache: {total_unused_conventional / len(models):.2f}%")
+print(f"Average % Unused Lines in reuse cache: {total_unused_reuse / len(models):.2f}%")
 
 ipc_ratios = [stats["ReuseCache"][model]['IPC'] / stats["ConventionalCache"][model]['IPC'] for model in models]
 hit_rate_ratios = [stats["ReuseCache"][model]['HitRate'] / stats["ConventionalCache"][model]['HitRate'] for model in models]
-unused_lines = [stats["ConventionalCache"][model]['EvictionStats'].get(0, 0) / stats["ConventionalCache"][model]['TotalLines'] * 100 for model in models]
+unused_lines_conventional = [stats["ConventionalCache"][model]['EvictionStats'].get(0, 0) / stats["ConventionalCache"][model]['TotalLines'] * 100 for model in models]
+unused_lines_reuse = [stats["ReuseCache"][model]['EvictionStats'].get(0, 0) / stats["ReuseCache"][model]['TotalLines'] * 100 for model in models]
 
 plt.figure(figsize=(30, 16))
 plt.bar(models, ipc_ratios, color='blue')
@@ -89,26 +97,28 @@ plt.tight_layout()
 plt.savefig('ipc_ratios_ml.png')
 
 
+# add the average line to the plot and write the average value on the plot
 plt.figure(figsize=(30, 16))
-plt.bar(models, hit_rate_ratios, color='green')
-plt.title('Hit Rate Ratios', fontsize=20)
-plt.xlabel('Model', fontsize=20)
-plt.ylabel('Hit Rate Ratio', fontsize=20)
-plt.xticks(rotation=45, fontsize=20)
-plt.tight_layout()
-plt.savefig('hit_rate_ratios_ml.png')
-
-plt.figure(figsize=(30, 16))
-plt.bar(models, unused_lines, color='red')
-plt.axhline(y=total_unused / len(models), color='r', linestyle='--', label='Average % Unused Lines')
-plt.text(0, total_unused / len(models) + 0.5, f'Average: {total_unused / len(models):.2f}%', color='r', fontsize=20)
+plt.bar(models, unused_lines_conventional, color='red')
+plt.axhline(y=total_unused_conventional / len(models), color='r', linestyle='--', label='Average % Unused Lines')
+plt.text(-1, total_unused_conventional / len(models) + 1, f'Average: {total_unused_conventional / len(models):.2f}%', color='r', fontsize=20)
 plt.title('Unused Lines %', fontsize=20)
-plt.xlabel('Model', fontsize=20)
+plt.xlabel('Trace', fontsize=20)
 plt.ylabel('Unused Lines %', fontsize=20)
 plt.xticks(rotation=45, fontsize=20)
 plt.tight_layout()
-plt.savefig('unused_lines_ml.png')
+plt.savefig('unused_lines_conventional_cache_ml.png')
 
+plt.figure(figsize=(30, 16))
+plt.bar(models, unused_lines_reuse, color='red')
+plt.axhline(y=total_unused_reuse / len(models), color='r', linestyle='--', label='Average % Unused Lines')
+plt.text(-1, total_unused_reuse / len(models) + 1, f'Average: {total_unused_reuse / len(models):.2f}%', color='r', fontsize=20)
+plt.title('Unused Lines %', fontsize=20)
+plt.xlabel('Trace', fontsize=20)
+plt.ylabel('Unused Lines %', fontsize=20)
+plt.xticks(rotation=45, fontsize=20)
+plt.tight_layout()
+plt.savefig('unused_lines_reuse_cache_ml.png')
 # plot a bar plot with conventianal ipc and reuse ipc sied by side in a bar graph
 
 plt.figure(figsize=(30, 16))
@@ -137,3 +147,12 @@ plt.xticks([i + width / 2 for i in x], models, rotation=45, fontsize=20)
 plt.legend()
 plt.tight_layout()
 plt.savefig('hit_rate_conv_reuse_ml.png')
+
+plt.figure(figsize=(30, 16))
+plt.bar(models, hit_rate_ratios, color='green')
+plt.title('Hit Rate Ratios', fontsize=20)
+plt.xlabel('Model', fontsize=20)
+plt.ylabel('Hit Rate Ratio', fontsize=20)
+plt.xticks(rotation=45, fontsize=20)
+plt.tight_layout()
+plt.savefig('hit_rate_ratios_ml.png')

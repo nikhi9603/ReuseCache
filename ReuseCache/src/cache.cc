@@ -491,13 +491,13 @@ void CACHE::handle_fill()
             if (cache_type == IS_L2C)
                 MSHR.entry[mshr_index].pf_metadata = l2c_prefetcher_cache_fill(MSHR.entry[mshr_index].address << LOG2_BLOCK_SIZE, set, way, (MSHR.entry[mshr_index].type == PREFETCH) ? 1 : 0,
                                                                                block[set][way].address << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].pf_metadata);
-            if (cache_type == IS_LLC)
-            {
-                cpu = fill_cpu;
-                MSHR.entry[mshr_index].pf_metadata = llc_prefetcher_cache_fill(MSHR.entry[mshr_index].address << LOG2_BLOCK_SIZE, set, way, (MSHR.entry[mshr_index].type == PREFETCH) ? 1 : 0,
-                                                                               block[set][way].address << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].pf_metadata);
-                cpu = 0;
-            }
+            // if (cache_type == IS_LLC)
+            // {
+            //     cpu = fill_cpu;
+            //     MSHR.entry[mshr_index].pf_metadata = llc_prefetcher_cache_fill(MSHR.entry[mshr_index].address << LOG2_BLOCK_SIZE, set, way, (MSHR.entry[mshr_index].type == PREFETCH) ? 1 : 0,
+            //                                                                    block[set][way].address << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].pf_metadata);
+            //     cpu = 0;
+            // }
 
 #ifdef NOTIFY_L1D_OF_DTLB_EVICTION
             // Neelu: Sending DTLB eviction notice to L1D
@@ -863,6 +863,7 @@ void CACHE::handle_writeback()
                 uint8_t miss_handled = 1;
                 int mshr_index = check_nonfifo_queue(&MSHR, &WQ.entry[index], false); //@Vishal: Updated from check_mshr
 
+                // VERIFY: This case might not happen as there is no return value of -2
                 if (mshr_index == -2)
                 {
                     // this is a data/instruction collision in the MSHR, so we have to wait before we can allocate this miss
@@ -1058,13 +1059,13 @@ void CACHE::handle_writeback()
                     else if (cache_type == IS_L2C)
                         WQ.entry[index].pf_metadata = l2c_prefetcher_cache_fill(WQ.entry[index].address << LOG2_BLOCK_SIZE, set, way, 0,
                                                                                 block[set][way].address << LOG2_BLOCK_SIZE, WQ.entry[index].pf_metadata);
-                    if (cache_type == IS_LLC)
-                    {
-                        cpu = writeback_cpu;
-                        WQ.entry[index].pf_metadata = llc_prefetcher_cache_fill(WQ.entry[index].address << LOG2_BLOCK_SIZE, set, way, 0,
-                                                                                block[set][way].address << LOG2_BLOCK_SIZE, WQ.entry[index].pf_metadata);
-                        cpu = 0;
-                    }
+                    // if (cache_type == IS_LLC)
+                    // {
+                    //     cpu = writeback_cpu;
+                    //     WQ.entry[index].pf_metadata = llc_prefetcher_cache_fill(WQ.entry[index].address << LOG2_BLOCK_SIZE, set, way, 0,
+                    //                                                             block[set][way].address << LOG2_BLOCK_SIZE, WQ.entry[index].pf_metadata);
+                    //     cpu = 0;
+                    // }
 
 #ifdef NOTIFY_L1D_OF_DTLB_EVICTION
                     // Neelu: Sending DTLB eviction notice to L1D
@@ -1087,6 +1088,7 @@ void CACHE::handle_writeback()
                     block[set][way].dirty = 1;
 
                     // check fill level
+                    // VERIFY: 
                     if (WQ.entry[index].fill_level < fill_level)
                     {
                         if (fill_level == FILL_L2)

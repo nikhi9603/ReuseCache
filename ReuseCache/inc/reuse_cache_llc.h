@@ -17,11 +17,13 @@ public:
     const uint32_t NUM_TAG_ARRAY_WAYS, NUM_TAG_ARRAY_SETS, NUM_DATA_ARRAY_WAYS, NUM_DATA_ARRAY_SETS;
     BLOCK **tag_array;
     BLOCK **data_array;
+    uint8_t *rr_ptr_tag_array;    // round-robin like ptr for NRR replacement for each set
+    uint8_t *rr_ptr_data_array;     // round-robin like ptr for NRU replacement
 
     uint64_t sim_llc_access[NUM_CPUS][NUM_TYPES],
         sim_llc_tag_miss[NUM_CPUS][NUM_TYPES],
         sim_llc_tag_hit[NUM_CPUS][NUM_TYPES],
-        sim_llc_data_miss[NUM_CPUS][NUM_TYPES],
+        sim_llc_data_miss[NUM_CPUS][NUM_TYPES],  // VERIFY: calculating data misses when tag is hit but data isnt found in data array.. (Tag misses shows data misses also since tag_miss means no data) So combination of this and tag_miss may be equal to MISS[]
         sim_llc_data_hit[NUM_CPUS][NUM_TYPES];
 
     map<uint64_t, uint32_t> num_uses_before_eviction;
@@ -30,15 +32,19 @@ public:
         : CACHE(name, 0, 0, 0, wq_size, rq_size, pq_size, mshr_size), NUM_TAG_ARRAY_WAYS(num_tag_array_ways), NUM_TAG_ARRAY_SETS(num_tag_array_sets), NUM_DATA_ARRAY_WAYS(num_data_array_ways), NUM_DATA_ARRAY_SETS(num_data_array_sets)
     {
         tag_array = new BLOCK *[NUM_TAG_ARRAY_SETS];
+        rr_ptr_tag_array = new uint8_t[NUM_TAG_ARRAY_SETS];
         for (uint32_t i = 0; i < NUM_TAG_ARRAY_SETS; i++)
         {
             tag_array[i] = new BLOCK[NUM_TAG_ARRAY_WAYS];
+            rr_ptr_tag_array[i] = 0;
         }
 
         data_array = new BLOCK *[NUM_DATA_ARRAY_SETS];
+        rr_ptr_data_array = new uint8_t[NUM_DATA_ARRAY_SETS];
         for (uint32_t i = 0; i < NUM_DATA_ARRAY_SETS; i++)
         {
             data_array[i] = new BLOCK[NUM_DATA_ARRAY_WAYS];
+            rr_ptr_data_array[i] = 0;
         }
 
         for (uint32_t i = 0; i < NUM_CPUS; i++)
@@ -66,6 +72,7 @@ public:
 
     int fill_cache_tag(uint32_t tag_array_set, PACKET *packet);
     int fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_way, PACKET *packet);
+    int fill_cache_tag_data(uint32_t tag_array_set, PACKET *packet);  // In writeback case...
     int check_tag_hit(PACKET *packet);
     int check_hit(PACKET *packet);
     int invalidate_entry(uint64_t inval_addr);
@@ -73,11 +80,12 @@ public:
     void handle_fill();
     void handle_writeback();
     void handle_read();
+    void handle_prefetch();
 
     void reuse_cache_llc_replacement_final_stats();
 
-    uint32_t reuse_cache_llc_find_tag_array_victim(uint32_t tag_array_set),
-        reuse_cache_llc_find_data_array_victim(uint32_t data_array_set);
+    uint32_t reuse_cache_llc_find_tag_array_victim(uint32_t tag_array_set, bool find_to_replace = true),
+        reuse_cache_llc_find_data_array_victim(uint32_t data_array_set, bool find_to_replace = true);
 };
 
 #endif

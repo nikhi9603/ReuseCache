@@ -22,8 +22,8 @@ run_simulation() {
     local TRACE="$1"
     local BASENAME=$(basename "$TRACE")
 
-    local SIMULATION=2000000000
-    local WARMUP=50000000
+    local SIMULATION=200000000
+    local WARMUP=30000000
     
     local OUTPUT_FILE="cache_output/${BASENAME%.xz}.out"
 
@@ -33,7 +33,7 @@ run_simulation() {
 }
 
 # Loop and run simulations in parallel
-for TRACE in ../traces/*.xz; do
+for TRACE in ../speccpu-traces/*.xz; do
     run_simulation "$TRACE" &
     ((job_count++))
 

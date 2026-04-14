@@ -18,44 +18,62 @@ cd "$NORMAL_OUTPUT_DIR" || exit 1
 mkdir -p conventional_output
 mkdir -p reuse_cache_output
 
-cd .. || exit 1
+# mkdir -p conventional_output_40
+# mkdir -p reuse_cache_output_40
 
-DATA_OUTPUT_DIR="MLOutputs_Data"
-mkdir -p "$DATA_OUTPUT_DIR"
-cd "$DATA_OUTPUT_DIR" || exit 1
-mkdir -p conventional_output
-mkdir -p reuse_cache_output
+# cd .. || exit 1
+
+# DATA_OUTPUT_DIR="MLOutputs_Data"
+# mkdir -p "$DATA_OUTPUT_DIR"
+# cd "$DATA_OUTPUT_DIR" || exit 1
+# mkdir -p conventional_output
+# mkdir -p reuse_cache_output
 
 cd ../ONNX-Runtime-Inference || exit 1
 
-NUM_JOBS=8
+NUM_JOBS=4
 
 job_count=0
+
+# models=("inception-v2-9.onnx"
+#         "mobilenetv2-12.onnx"
+#         "inception-v1-12.onnx")
+#         # "googlenet-12.onnx" 
+#         # "resnet50-v1-12.onnx"
+#         # "shufflenet-v2-12.onnx"
+#         # "squeezenet1.1-7.onnx"
+#         # "vgg16-bn-7.onnx")
+for f in "$MODELS_DIR"/*.onnx; do
+    models+=("$f")
+done
 
 generate_trace_and_run() {
     local model=$1
     local model_name=$(basename "$model" .onnx)
 
-    echo "Generating trace for $model_name"
-    pin -t "$NORMAL_TRACER" -o "$model_name.champsim.normal.trace" -- build/src/inference --use_cpu $model > /dev/null 2>&1
-    pin -t "$DATA_TRACER" -o "$model_name.champsim.data.trace" -- build/src/inference --use_cpu $model > /dev/null 2>&1
+    #echo "Generating trace for $model_name"
+    #../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$NORMAL_TRACER" -o "$model_name.champsim.normal.trace" -- build/src/inference --use_cpu $model > /dev/null 2>&1
+    # pin -t "$DATA_TRACER" -o "$model_name.champsim.data.trace" -- build/src/inference --use_cpu $model > /dev/null 2>&1
 
     echo "Running simulation for $model_name"
 
-    $CONVENTIONAL_NORMAL_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output/${model_name}.out" 2>&1
-    $REUSE_NORMAL_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
+    # $CONVENTIONAL_NORMAL_PROGRAM --warmup_instructions 80000000 --simulation_instructions 200000000 --uncompressed_trace -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output/${model_name}.out" 2>&1
+    $REUSE_NORMAL_PROGRAM --warmup_instructions 80000000 --simulation_instructions 200000000 --uncompressed_trace --reuse_cache_llc -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
 
-    $CONVENTIONAL_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output/${model_name}.out" 2>&1
-    $REUSE_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
+    # $CONVENTIONAL_NORMAL_PROGRAM --warmup_instructions 30000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output_40/${model_name}.out" 2>&1
+    # $REUSE_NORMAL_PROGRAM --warmup_instructions 30000000 --simulation_instructions 400000000 --uncompressed_trace --reuse_cache_llc -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output_40/${model_name}.out" 2>&1
 
-    rm "$model_name.champsim.normal.trace"
-    rm "$model_name.champsim.data.trace"
+    # $CONVENTIONAL_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output/${model_name}.out" 2>&1
+    # $REUSE_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
+
+    #rm "$model_name.champsim.normal.trace"
+    # rm "$model_name.champsim.data.trace"
     
     echo "Simulation for $model_name completed"
 }
 
 #Loop through model
-for model in $MODELS_DIR/*.onnx; do
+for model in "${models[@]}"; do
     model_name=$(basename "$model" .onnx)
 
     generate_trace_and_run "$model" &

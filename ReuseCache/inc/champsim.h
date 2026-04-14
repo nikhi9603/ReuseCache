@@ -22,7 +22,7 @@
 // USEFUL MACROS
 // #define DEBUG_PRINT
 #define SANITY_CHECK
-#define LLC_BYPASS
+// #define LLC_BYPASS
 // #define L2_BYPASS 		//Neelu: While uncommenting, set bypass mode in cache.cc as well, otherwise it will not work.
 #define DRC_BYPASS
 // #define NO_CRC2_COMPILE

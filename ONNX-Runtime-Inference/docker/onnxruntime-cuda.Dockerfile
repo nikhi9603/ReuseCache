@@ -120,5 +120,6 @@ RUN cd /tmp && \
         --skip_tests \
         --parallel ${NUM_JOBS} && \
     cd build/Linux/RelWithDebInfo && \
+    make install && \
     # pip install dist/* && \
     rm -rf /tmp/*

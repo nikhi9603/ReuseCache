@@ -68,7 +68,7 @@ void CACHE::handle_fill()
                 fill_packet_type = 3;
         }
 
-#ifdef L2_BYPASS
+#ifdef L2_BYPASShandle_w
 
         // Knob for bypassing only instructions or only data or both - L2C_BYPASS_MODE
 
@@ -184,6 +184,7 @@ void CACHE::handle_fill()
         // Prefetch translation requests should be dropped in case of page fault
         if (cache_type == IS_ITLB || cache_type == IS_DTLB || cache_type == IS_STLB)
         {
+            // Is this because translation requests from L1D go to STLB?
             if (cache_type == IS_DTLB && MSHR.entry[mshr_index].type == TRANSLATION_FROM_L1D)
                 assert(0);
             if (MSHR.entry[mshr_index].data == (UINT64_MAX >> LOG2_PAGE_SIZE))
