@@ -246,6 +246,56 @@ public:
 		}
 		return k;
 	}
+
+	// remove a value from the set
+ 
+	void remove (TYPE x) {
+		// empty set, nothing to do
+		if (!card) return;
+ 
+		// --- singleton ---
+		if (card == 1) {
+			if (data.values[0] == x) card = 0;
+			return;
+		}
+ 
+		// --- small set: sorted array ---
+		if (card < SMALL_SIZE) {
+			for (int i = 0; i < card; i++) {
+				if (data.values[i] > x) return;   // sorted, x can't appear later
+				if (data.values[i] == x) {
+					// shift everything after i one step left
+					for (int j = i; j < card - 1; j++)
+						data.values[j] = data.values[j + 1];
+					card--;
+					return;
+				}
+			}
+			return; // not found
+		}
+ 
+		// --- large bitset ---
+		if (!getbit (x)) return;   // not present, nothing to do
+ 
+		// clear the bit and decrement cardinality
+		int word = x >> 6;
+		int bit  = x & 63;
+		data.bits[word] &= ~(1ull << bit);
+		card--;
+ 
+		// if we've dropped back below SMALL_SIZE we must rebuild the
+		// sorted values[] array, because the rest of the code uses
+		// card < SMALL_SIZE as the signal to use the small-set path
+		if (card < SMALL_SIZE) {
+			TYPE tmp[SMALL_SIZE];
+			int k = 0;
+			// scan bits low-to-high so tmp[] comes out sorted automatically
+			for (TYPE i = 0; i < MAX_SIZE && k < card; i++)
+				if (getbit (i)) tmp[k++] = i;
+			memcpy (data.values, tmp, sizeof (TYPE) * card);
+		}
+	}
+
 };
 
 // this little macro iterates over either the whole set or just the single member

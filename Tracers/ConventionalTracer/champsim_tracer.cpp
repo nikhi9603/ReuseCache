@@ -320,9 +320,31 @@ VOID Instruction(INS ins, VOID *v)
 {       
     // begin each instruction with this function
     UINT32 opcode = INS_Opcode(ins);
+    // printf("Opcode = %d\n", opcode);
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction, IARG_INST_PTR, IARG_UINT32, opcode, IARG_END);
 
-    // instrument branch instructions
+    // // instrument branch instructions
+    // std::string opcode_str = INS_Mnemonic(ins);
+    // xed_category_enum_t cat = (xed_category_enum_t)INS_Category(ins);
+    
+    // // 1. Filter by category
+    // if (cat == XED_CATEGORY_X87_ALU || 
+    //     cat == XED_CATEGORY_SSE || 
+    //     cat == XED_CATEGORY_AVX || 
+    //     cat == XED_CATEGORY_AVX512) 
+    // {
+    //     // 2. Exclude Data Transfer (Moves)
+    //     // We want math, not just 'VMOVAPS' or 'MOVSS'
+    //     if (cat != XED_CATEGORY_DATAXFER && cat != XED_CATEGORY_LOGICAL) {
+    //         printf("Yes-FP\n");
+    //     }
+    //     else{printf("No-FP\n");}
+    // }
+    // else
+    // {
+    //     printf("No-FP\n");
+    // }
+    // printf("Opcode string = %s\n", opcode_str.c_str());
     if(INS_IsBranch(ins))
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_END);
 

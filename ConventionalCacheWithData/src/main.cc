@@ -316,6 +316,18 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         cout << cache->NAME << " Dense regions hint to LLC: " << cache->sending_hint_to_llc << endl;
         // iterate over num_uses_before_eviction map"
         cout << endl;
+        
+        for(int i = 0; i < cache->NUM_SET; i++)
+        {
+            for(int j = 0; j < cache->NUM_WAY; j++)
+            {
+                if(cache->block[i][j].valid == 1)
+                {
+                    cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
+                }
+            }
+        }
+        
         cout << "In LLC: " << endl;
         int totalLines = 0;
         for (auto &use : cache->num_uses_before_eviction)
@@ -482,6 +494,133 @@ void reset_cache_stats(uint32_t cpu, CACHE *cache)
     cache->PQ.TO_CACHE = 0;
     cache->PQ.FORWARD = 0;
     cache->PQ.FULL = 0;
+
+    for(auto &num_uses: cache->num_uses_before_eviction)
+    {
+        num_uses.second = 0;
+    }
+
+    for(int i = 0; i < cache->NUM_SET; i++)
+    {
+        for(int j = 0; j < cache->NUM_WAY; j++)
+        {
+            if(cache->block[i][j].valid == 1)
+            {
+                cache->block[i][j].num_uses = 0;
+            }
+        }
+    }
+}
+
+void print_llc_warmup_stats(uint32_t cpu, CACHE *cache)
+{
+    if(cpu == 0)
+    {
+        cout << "CPU IS 0 ONLY" << endl;
+        uint64_t TOTAL_ACCESS = 0, TOTAL_HIT = 0, TOTAL_MISS = 0, TOTAL_INSTR_MISS = 0;
+        record_roi_stats(cpu, cache);
+
+        for (uint32_t i = 0; i < NUM_TYPES; i++)
+        {
+            TOTAL_ACCESS += cache->roi_access[cpu][i];
+            TOTAL_HIT += cache->roi_hit[cpu][i];
+            TOTAL_MISS += cache->roi_miss[cpu][i];
+            TOTAL_INSTR_MISS += cache->roi_instr_miss[cpu][i];
+        }
+
+        uint64_t num_instrs = ooo_cpu[cpu].finish_sim_instr;
+
+        if (TOTAL_ACCESS != 0)
+        {
+            cout << cache->NAME;
+            cout << " WARMUP TOTAL ACCESS: " << setw(10) << TOTAL_ACCESS << "  HIT: " << setw(10) << TOTAL_HIT << "  MISS: " << setw(10) << TOTAL_MISS << "  HIT %: " << setw(10) << ((double)TOTAL_HIT * 100 / TOTAL_ACCESS) << "  MISS %: " << setw(10) << ((double)TOTAL_MISS * 100 / TOTAL_ACCESS) << "   MPKI: " << ((double)TOTAL_MISS * 1000 / num_instrs) << endl;
+        }
+
+        if (cache->roi_access[cpu][0])
+        {
+            cout << cache->NAME;
+            cout << " WARMUP LOAD      ACCESS: " << setw(10) << cache->roi_access[cpu][0] << "  HIT: " << setw(10) << cache->roi_hit[cpu][0] << "  MISS: " << setw(10) << cache->roi_miss[cpu][0] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][0] * 100 / cache->roi_access[cpu][0]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][0] * 100 / cache->roi_access[cpu][0]) << "   MPKI: " << ((double)cache->roi_miss[cpu][0] * 1000 / num_instrs) << endl; // << " T_ACCESS: " << setw(10) << cache->ACCESS[0] << " T_HIT: " << setw(10) << cache->HIT[0] << " T_MISS: " << setw(10) << cache->MISS[0] << " T_MSHR_MERGED: " << cache->MSHR_MERGED[0] << endl; //@Vishal: MSHR merged will give correct result for 1 core, multi_core will give whole sim
+
+            if (cache->cache_type == IS_L2C)
+            {
+                // Neelu: Instruction and Data loads.
+                cout << cache->NAME << " WARMUP DATA LOAD MPKI: " << ((double)(cache->roi_miss[cpu][0] - cache->roi_instr_miss[cpu][0]) * 1000 / num_instrs) << endl;
+                cout << cache->NAME << " WARMUP INSTRUCTION LOAD MPKI: " << ((double)(cache->roi_instr_miss[cpu][0]) * 1000 / num_instrs) << endl;
+            }
+        }
+
+        if (cache->roi_access[cpu][1])
+        {
+            cout << cache->NAME;
+            cout << " WARMUP RFO      ACCESS: " << setw(10) << cache->roi_access[cpu][1] << "  HIT: " << setw(10) << cache->roi_hit[cpu][1] << "  MISS: " << setw(10) << cache->roi_miss[cpu][1] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][1] * 100 / cache->roi_access[cpu][1]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][1] * 100 / cache->roi_access[cpu][1]) << "   MPKI: " << ((double)cache->roi_miss[cpu][1] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[1] << " T_HIT: " << setw(10) << cache->HIT[1] << " T_MISS: " << setw(10) << cache->MISS[1] << " T_MSHR_MERGED: " << cache->MSHR_MERGED[1] << endl;
+        }
+
+        if (cache->roi_access[cpu][2])
+        {
+            cout << cache->NAME;
+            cout << "WARMUP PREFETCH  ACCESS: " << setw(10) << cache->roi_access[cpu][2] << "  HIT: " << setw(10) << cache->roi_hit[cpu][2] << "  MISS: " << setw(10) << cache->roi_miss[cpu][2] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][2] * 100 / cache->roi_access[cpu][2]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][2] * 100 / cache->roi_access[cpu][2]) << "   MPKI: " << ((double)cache->roi_miss[cpu][2] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[2] << " T_HIT: " << setw(10) << cache->HIT[2] << " T_MISS: " << setw(10) << cache->MISS[2] << " T_MSHR_MERGED: " << cache->MSHR_MERGED[2] << endl;
+
+            // cout << "AGUS PREFETCH L1 MISS" << pf_miss_l1 << endl;
+
+            if (cache->cache_type == IS_L2C)
+            {
+                // Neelu: Instruction and Data loads.
+                cout << cache->NAME << " WARMUP  DATA PREFETCH MPKI: " << ((double)(cache->roi_miss[cpu][2] - cache->roi_instr_miss[cpu][2]) * 1000 / num_instrs) << endl;
+                cout << cache->NAME << " WARMUP  INSTRUCTION PREFETCH MPKI: " << ((double)(cache->roi_instr_miss[cpu][2]) * 1000 / num_instrs) << endl;
+            }
+        }
+
+        if (cache->roi_access[cpu][3])
+        {
+            cout << cache->NAME;
+            cout << " WARMUP WRITEBACK      ACCESS: " << setw(10) << cache->roi_access[cpu][3] << "  HIT: " << setw(10) << cache->roi_hit[cpu][3] << "  MISS: " << setw(10) << cache->roi_miss[cpu][3] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][3] * 100 / cache->roi_access[cpu][3]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][3] * 100 / cache->roi_access[cpu][3]) << "   MPKI: " << ((double)cache->roi_miss[cpu][3] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[3] << " T_HIT: " << setw(10) << cache->HIT[3] << " T_MISS: " << setw(10) << cache->MISS[3] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[3] << endl;
+        }
+
+        if (cache->roi_access[cpu][4])
+        {
+            cout << cache->NAME;
+            cout << " WARMUP LOAD TRANSLATION ACCESS: " << setw(10) << cache->roi_access[cpu][4] << "  HIT: " << setw(10) << cache->roi_hit[cpu][4] << "  MISS: " << setw(10) << cache->roi_miss[cpu][4] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][4] * 100 / cache->roi_access[cpu][4]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][4] * 100 / cache->roi_access[cpu][4]) << "   MPKI: " << ((double)cache->roi_miss[cpu][4] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
+        }
+
+        if (cache->roi_access[cpu][5])
+        {
+            cout << cache->NAME;
+            cout << " WARMUP PREFETCH TRANSLATION ACCESS: " << setw(10) << cache->roi_access[cpu][5] << "  HIT: " << setw(10) << cache->roi_hit[cpu][5] << "  MISS: " << setw(10) << cache->roi_miss[cpu][5] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][5] * 100 / cache->roi_access[cpu][5]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][5] * 100 / cache->roi_access[cpu][5]) << "   MPKI: " << ((double)cache->roi_miss[cpu][5] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
+        }
+        if (cache->roi_access[cpu][6])
+        {
+            cout << cache->NAME;
+            cout << " WARMUP TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->roi_access[cpu][6] << "  HIT: " << setw(10) << cache->roi_hit[cpu][6] << "  MISS: " << setw(10) << cache->roi_miss[cpu][6] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][6] * 100 / cache->roi_access[cpu][6]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][6] * 100 / cache->roi_access[cpu][6]) << "   MPKI: " << ((double)cache->roi_miss[cpu][6] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
+        }
+
+        for(int i = 0; i < cache->NUM_SET; i++)
+        {
+            for(int j = 0; j < cache->NUM_WAY; j++)
+            {
+                if(cache->block[i][j].valid == 1)
+                {
+                    cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
+                }
+            }
+        }
+
+        std::cout << "In Conventional Cache by the end of warmup:" << std::endl;
+        int totalLines = 0;
+        for (auto &use : cache->num_uses_before_eviction)
+        {
+            totalLines += use.second;
+            std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
+        }
+        std::cout << "Total number of lines: " << totalLines << std::endl;
+
+        for (uint32_t i = 0; i < NUM_TYPES; i++)
+        {
+            cache->roi_access[cpu][i] = 0;
+            cache->roi_hit[cpu][i] = 0;
+            cache->roi_miss[cpu][i] = 0;
+            cache->roi_instr_miss[cpu][i] = 0;
+        }
+    }
 }
 
 void finish_warmup()
@@ -534,6 +673,7 @@ void finish_warmup()
         reset_cache_stats(i, &ooo_cpu[i].L1I);
         reset_cache_stats(i, &ooo_cpu[i].L1D);
         reset_cache_stats(i, &ooo_cpu[i].L2C);
+        print_llc_warmup_stats(i, &uncore.LLC);
         reset_cache_stats(i, &uncore.LLC);
         reset_cache_stats(i, &ooo_cpu[i].BTB);
 
@@ -1628,19 +1768,22 @@ int main(int argc, char **argv)
                 // complete
                 ooo_cpu[i].update_rob();
 
+                // TODO: I think this should be order
+                // execute
+                ooo_cpu[i].execute_instruction();
+
                 // schedule (including decode latency)
                 uint32_t schedule_index = ooo_cpu[i].ROB.next_schedule;
                 if ((ooo_cpu[i].ROB.entry[schedule_index].scheduled == 0) && (ooo_cpu[i].ROB.entry[schedule_index].event_cycle <= current_core_cycle[i]))
                     ooo_cpu[i].schedule_instruction();
 
-                // execute
-                ooo_cpu[i].execute_instruction();
 
                 ooo_cpu[i].update_rob();
 
+                // TODO: I think this should be order
                 // memory operation
-                ooo_cpu[i].schedule_memory_instruction();
                 ooo_cpu[i].execute_memory_instruction();
+                ooo_cpu[i].schedule_memory_instruction();
 
                 ooo_cpu[i].update_rob();
 

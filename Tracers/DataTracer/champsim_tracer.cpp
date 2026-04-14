@@ -54,7 +54,10 @@ trace_instr_format_t curr_instr;
 bool skip_curr_instr = false;
 
 int memoryWriteIndex;
-
+int skipInstructionCount = 0;
+int readSkipInstrCount = 0;
+int writeSkipInstrCount = 0;
+int unalignedAccessCount = 0;
 // std::map<UINT64, UINT64> read_size_map;
 // std::map<UINT64, UINT64> write_size_map;
 
@@ -70,7 +73,7 @@ KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "champsim.
 KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "500000000",
                                   "How many instructions to skip before tracing begins");
 
-KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "450000000",
+KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "400000000",
                                    "How many instructions to trace");
 
 /* ===================================================================== */
@@ -376,7 +379,7 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
     bool already_found = false;
     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
     {
-        if (curr_instr.source_memory_address[i] == ((unsigned long long int)addr))
+        if ((curr_instr.source_memory_address[i] == ((unsigned long long int)addr)) && (curr_instr.source_memory_size[i] == read_size))
         {
             already_found = true;
             break;
@@ -392,6 +395,17 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
                 curr_instr.source_memory_address[i] = (unsigned long long int)addr;
                 curr_instr.source_memory_size[i] = read_size;
                 curr_instr.source_memory_value[i] = new unsigned char[read_size];
+
+                uint32_t blocksize = 64;
+                uint32_t offset = curr_instr.source_memory_address[i] & (blocksize - 1);
+
+                if(read_size <= MAX_MEMORY_SIZE)
+                {
+                    if(offset + read_size > blocksize)
+                    {
+                        unalignedAccessCount++;
+                    }
+                }
 
                 if (debug)
                     std::cout << "Instruction read " << read_size << " bytes at 0x" << std::hex << addr << std::endl;
@@ -415,7 +429,7 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
                     curr_instr.source_memory_value[i] = nullptr;
                     curr_instr.source_memory_size[i] = 0;
 
-                    if (debug)
+                    // if (debug)
                         std::cout << "Failed to obtain memory from 0x" << std::hex << addr << std::dec << std::endl;
                 }
 
@@ -433,6 +447,7 @@ void MemoryWriteCaptureAddress(VOID *addr, uint32_t index)
     bool already_found = false;
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
     {
+        // TODO:: I think may not happen?
         if (curr_instr.destination_memory_address[i] == ((unsigned long long int)addr))
         {
             already_found = true;
@@ -487,7 +502,7 @@ void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
             curr_instr.destination_memory_size[memoryWriteIndex] = 0;
             curr_instr.destination_memory_value[memoryWriteIndex] = nullptr;
 
-            if (debug)
+            // if (debug)
                 std::cout << "Failed to obtain memory from 0x" << std::hex << addr << std::endl;
         }
 
@@ -495,17 +510,18 @@ void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
     }
     else
     {
-        if (debug)
+        // if (debug)
             std::cout << "Memory write value instrumentation failed to find a memory write address" << std::endl;
     }
 }
 
-void MemoryWriteValueForCall()
+void MemoryWriteValueForCall(uint32_t size_of_call_instruction)
 {
     if (!tracing_on)
         return;
 
-    if (memoryWriteIndex != -1)
+    // TODO:: Check is memoryWriteIndex != -1, does it mean they don't want to consider? If yes, why even handle the case
+    if (memoryWriteIndex != -1)     
     {
         curr_instr.destination_memory_size[memoryWriteIndex] = 0;
         curr_instr.destination_memory_value[memoryWriteIndex] = nullptr;
@@ -513,16 +529,17 @@ void MemoryWriteValueForCall()
     }
     else
     {
-        curr_instr.destination_memory_size[memoryWriteIndex] = 8;
-        curr_instr.destination_memory_value[memoryWriteIndex] = new unsigned char[8];
-        unsigned long long int return_address = curr_instr.ip + SIZE_OF_CALL_INSTRUCTION;
-        std::memcpy(curr_instr.destination_memory_value[memoryWriteIndex], &return_address, 8);
+        // curr_instr.destination_memory_size[memoryWriteIndex] = 8;
+        // curr_instr.destination_memory_value[memoryWriteIndex] = new unsigned char[8];
+        // unsigned long long int return_address = curr_instr.ip + SIZE_OF_CALL_INSTRUCTION;
+        // std::cout << "size of call instruction : " << size_of_call_instruction << std::endl;
+        // std::memcpy(curr_instr.destination_memory_value[memoryWriteIndex], &return_address, 8);
 
-        memoryWriteIndex = -1;
+        // memoryWriteIndex = -1;
 
-        if (debug)
-            std::cout << "Memory write value for call instruction at 0x" << std::hex << curr_instr.ip
-                      << " with value " << return_address << std::dec << std::endl;
+        // if (debug)
+        //     std::cout << "Memory write value for call instruction at 0x" << std::hex << curr_instr.ip
+        //               << " with value " << return_address << std::dec << std::endl;
     }
 }
 
@@ -534,9 +551,13 @@ void MemoryWriteValueForCall()
 VOID Instruction(INS ins, VOID *v)
 {
     uint32_t memOperands = INS_MemoryOperandCount(ins);
+    std::cout << std::endl;
+    std::cout << "memOperandscount = " << memOperands << std::endl ;
 
     // begin each instruction with this function
     uint32_t opcode = INS_Opcode(ins);
+    std::string opcodeStr = INS_Mnemonic(ins);
+    std::cout << "Opcode = " << opcode << " - " << opcodeStr << std::endl;
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction,
                    IARG_INST_PTR,
                    IARG_UINT32, opcode,
@@ -552,6 +573,8 @@ VOID Instruction(INS ins, VOID *v)
 
     // instrument register reads
     uint32_t readRegCount = INS_MaxNumRRegs(ins);
+    std::cout << "readRegCount = " << readRegCount << std::endl;
+
     for (uint32_t i = 0; i < readRegCount; i++)
     {
         uint32_t regNum = INS_RegR(ins, i);
@@ -564,6 +587,8 @@ VOID Instruction(INS ins, VOID *v)
 
     // instrument register writes
     uint32_t writeRegCount = INS_MaxNumWRegs(ins);
+    std::cout << "writeRegCount = " << readRegCount << std::endl;
+
     for (uint32_t i = 0; i < writeRegCount; i++)
     {
         uint32_t regNum = INS_RegW(ins, i);
@@ -584,7 +609,10 @@ VOID Instruction(INS ins, VOID *v)
             uint32_t read_size = INS_MemoryOperandSize(ins, memOp);
             if (read_size > MAX_MEMORY_SIZE)
             {
+                std::cout << "MemoryOperand is Read - " << memOp << ", size = " << read_size << std::endl;
                 skip_curr_instr = true;
+                skipInstructionCount++;
+                readSkipInstrCount++;
                 break;
             }
 
@@ -607,10 +635,16 @@ VOID Instruction(INS ins, VOID *v)
                 uint32_t write_size = INS_MemoryOperandSize(ins, memOp);
                 if (write_size > MAX_MEMORY_SIZE)
                 {
+                    std::cout << "MemoryOperand is Write - " << memOp << ", size = " << write_size << std::endl;
                     skip_curr_instr = true;
+                    skipInstructionCount++;
+                    writeSkipInstrCount++;
                     break;
                 }
+                else
+                {
 
+                }
                 INS_InsertCall(ins, IPOINT_AFTER, (AFUNPTR)MemoryWriteCaptureValue,
                                IARG_UINT32, memOp,
                                IARG_UINT32, write_size,
@@ -618,16 +652,17 @@ VOID Instruction(INS ins, VOID *v)
             }
             else if (INS_IsCall(ins))
             {
-                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryWriteValueForCall,
+                std::cout << "MemoryOperand is Write but ISCall - " << memOp << std::endl;
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryWriteValueForCall, IARG_UINT32, INS_Size(ins),
                                IARG_END);
             }
             else
             {
-                if (debug)
-                {
+                // if (debug)
+                // {
                     std::cout << "Warning: Memory write instrumentation at IPOINT_AFTER for instruction ** " << INS_Disassemble(ins) << " ** is invalid" << std::endl;
                     std::cout << "Opcode: " << std::dec << INS_Opcode(ins) << std::endl;
-                }
+                // }
             }
         }
     }
@@ -658,6 +693,9 @@ VOID Fini(INT32 code, VOID *v)
         fclose(out);
         output_file_closed = true;
     }
+    std::cout << "Skip Instruction count = " << skipInstructionCount << std::endl;
+    std::cout << "Skip Read Instruction count = " << readSkipInstrCount << std::endl;
+    std::cout << "Skip Write Instruction count = " << writeSkipInstrCount << std::endl;
 }
 
 /*!

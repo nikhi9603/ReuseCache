@@ -6,7 +6,7 @@
 #define LQ_SIZE 128
 #define SQ_SIZE 72
 #define NUM_INSTR_DESTINATIONS_SPARC 4
-#define NUM_INSTR_DESTINATIONS 2
+#define NUM_INSTR_DESTINATIONS 4
 #define NUM_INSTR_SOURCES 4
 
 // special registers that help us identify branches
@@ -217,9 +217,9 @@ public:
     // uint8_t memory_instrs_depend_on_me[ROB_SIZE];
     fastset memory_instrs_depend_on_me;
 
-    uint32_t lq_index[NUM_INSTR_SOURCES],
-        sq_index[NUM_INSTR_DESTINATIONS_SPARC],
-        forwarding_index[NUM_INSTR_DESTINATIONS_SPARC];
+    uint32_t lq_index[2*NUM_INSTR_SOURCES],
+        sq_index[2*NUM_INSTR_DESTINATIONS_SPARC],
+        forwarding_index[NUM_INSTR_DESTINATIONS_SPARC]; // TODO:: Are we using this? (Currently no) If yes, check whether size of this should be twice of num of destinations
 
     ooo_model_instr()
     {
@@ -276,6 +276,7 @@ public:
             source_virtual_address[i] = 0;
             source_added[i] = 0;
             lq_index[i] = UINT32_MAX;
+            lq_index[i+NUM_INSTR_SOURCES] = UINT32_MAX;
             reg_RAW_checked[i] = 0;
         }
 
@@ -286,6 +287,7 @@ public:
             destination_virtual_address[i] = 0;
             destination_added[i] = 0;
             sq_index[i] = UINT32_MAX;
+            sq_index[i+NUM_INSTR_SOURCES] = UINT32_MAX;
             forwarding_index[i] = 0;
         }
 

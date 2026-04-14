@@ -2962,10 +2962,10 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
 
 
     memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, packet->data_size);
-    for (int i = 0; i < packet->data_size; i++)
-    {
-        block[set][way].data_valid[i + packet->block_offset] = true;
-    }
+    // for (int i = 0; i < packet->data_size; i++)
+    // {
+        // block[set][way].data_valid[i + packet->block_offset] = true;
+    // }
     
 
     // Neelu: Setting instruction and translation fields in L2C

@@ -216,8 +216,8 @@ class O3_CPU {
 
     void initialize_core();
     void core_final_stats();
-    void add_load_queue(uint32_t rob_index, uint32_t data_index),
-         add_store_queue(uint32_t rob_index, uint32_t data_index),
+    void add_load_queue(uint32_t rob_index, uint32_t data_index, uint64_t address, uint32_t block_offset, uint32_t data_size, uint32_t lq_data_index, unsigned char* data_value),
+         add_store_queue(uint32_t rob_index, uint32_t data_index, uint64_t address, uint32_t block_offset, uint32_t data_size, uint32_t sq_data_index, unsigned char* data_value),
          execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_index);
     int  execute_load(uint32_t rob_index, uint32_t sq_index, uint32_t data_index);
     void check_dependency(int prior, int current);

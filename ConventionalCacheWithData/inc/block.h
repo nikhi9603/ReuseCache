@@ -35,7 +35,7 @@ public:
     // replacement state
     uint32_t lru;
     unsigned char *data_value;
-    bool *data_valid;
+    // bool *data_valid;
 
     BLOCK()
     {
@@ -64,11 +64,11 @@ public:
         num_uses = 0;
 
         data_value = new unsigned char[BLOCK_SIZE];
-        data_valid = new bool[BLOCK_SIZE];
+        // data_valid = new bool[BLOCK_SIZE];
         for (uint32_t i = 0; i < BLOCK_SIZE; i++)
         {
             data_value[i] = 0;
-            data_valid[i] = false;
+            // data_valid[i] = false;
         }
     };
 };
@@ -414,6 +414,8 @@ public:
         event_cycle;
 
     uint32_t rob_index, data_index, sq_index;
+    uint32_t block_offset, data_size;
+    unsigned char* data_value;
 
     uint8_t translated,
         fetched,
@@ -441,6 +443,9 @@ public:
         asid[0] = UINT8_MAX;
         asid[1] = UINT8_MAX;
 
+        block_offset = 0;
+        data_size = 0;
+        data_value = nullptr;
 #if 0
         for (uint32_t i=0; i<ROB_SIZE; i++)
             forwarding_depend_on_me[i] = 0;
