@@ -1644,6 +1644,7 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
             }
             else
             {
+                break;
                 // DP(if(warmup_complete[cpu]) {
                 // cout << "[LQ] " << __func__ << " instr_id: " << hex << ROB.entry[rob_index].instr_id;
                 // cout << " cannot be added in the load queue occupancy: " << LQ.occupancy << " cycle: " << current_core_cycle[cpu] << endl;
@@ -1718,6 +1719,7 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
             }
             else
             {
+                break;
                 // DP(if(warmup_complete[cpu]) {
                 // cout << "[SQ] " << __func__ << " instr_id: " << hex << ROB.entry[rob_index].instr_id;
                 // cout << " cannot be added in the store queue occupancy: " << SQ.occupancy << " cycle: " << current_core_cycle[cpu] << endl;
@@ -1839,13 +1841,14 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
         // if (SQ.entry[i].virtual_address == LQ.entry[lq_index].virtual_address)
 
         // I think equality check is not enough
-        uint64_t store_start = SQ.entry[i].virtual_address;
-        uint64_t store_end   = store_start + SQ.entry[i].data_size;
-        uint64_t load_start  = LQ.entry[lq_index].virtual_address;
-        uint64_t load_end    = load_start + LQ.entry[lq_index].data_size;
+        uint64_t store_addr = SQ.entry[i].virtual_address;
+        // uint64_t store_end   = store_start + SQ.entry[i].data_size;
+        uint64_t load_addr  = LQ.entry[lq_index].virtual_address;
+        // uint64_t load_end    = load_start + LQ.entry[lq_index].data_size;
 
-        // complete overlap of load in store range
-        if(store_start <= load_start && store_end >= load_end)
+        //// complete overlap of load in store range
+        // if(store_start <= load_start && store_end >= load_end)
+        if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
         { // store-to-load forwarding check
 
             // forwarding store is in the SQ
@@ -1952,12 +1955,13 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
         // TODO:: I think this just equality check is wrong 
         // if (ROB.entry[prior].destination_memory[i] == ROB.entry[current].source_memory[data_index])
         uint64_t store_addr = ROB.entry[prior].destination_memory[i];
-        uint32_t store_size = ROB.entry[prior].destination_memory_size[i];
+        // uint32_t store_size = ROB.entry[prior].destination_memory_size[i];
 
-        uint64_t load_addr = ROB.entry[current].source_memory[data_index];
-        uint32_t load_size = ROB.entry[current].source_memory_size[data_index];
+        uint64_t load_addr = LQ.entry[lq_index].virtual_address;
+        // uint32_t load_size = ROB.entry[current].source_memory_size[data_index];
 
-        if ((store_addr < load_addr + load_size) && (load_addr < store_addr + store_size))
+        // if ((store_addr < load_addr + load_size) && (load_addr < store_addr + store_size))
+        if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
         { //  store-to-load forwarding check
 
             // we need to mark this dependency in the ROB since the producer might not be added in the store queue yet
@@ -2323,25 +2327,26 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
                     bool isUnaligned = (dependent_load_size > 0) && (line1 != line2);
                     int num_of_load_entries = (isUnaligned) ? 2 : 1;
 
-                    uint32_t line1_data_size, line2_data_size;
-                    line1_data_size = (isUnaligned) ? (uint32_t)(line2_addr -  dependent_load_size) : dependent_load_size;
-                    line2_data_size = dependent_load_size - line1_data_size;
+                    // uint32_t line1_data_size, line2_data_size;
+                    // line1_data_size = (isUnaligned) ? (uint32_t)(line2_addr -  dependent_load_addr) : dependent_load_size;
+                    // line2_data_size = dependent_load_size - line1_data_size;
 
                     // if (ROB.entry[dependent].source_memory[j] == SQ.entry[sq_index].virtual_address)
                     // { // this is required since a single instruction can issue multiple loads
-                    // TODO:: I think this just equality check is wrong 
+                    // // TODO:: I think this just equality check is wrong , may be checking should be done cache line address or completely along with size
                     uint64_t store_addr = SQ.entry[sq_index].virtual_address;
-                    uint32_t store_size = SQ.entry[sq_index].data_size;
+                    // uint32_t store_size = SQ.entry[sq_index].data_size;
                     
                     for(int i = 0; i < num_of_load_entries; i++)
                     {
                         uint32_t idx = 2*j + i;     // to get dependent lq_index 
                         uint32_t lq_index = ROB.entry[dependent].lq_index[idx];
                         uint64_t load_addr = LQ.entry[lq_index].virtual_address;
-                        uint32_t load_size = LQ.entry[lq_index].data_size;
+                        // uint32_t load_size = LQ.entry[lq_index].data_size;
 
-                        // full overlap only for forwarding unlike dependency
-                        if((store_addr <= load_addr) && (store_addr + store_size >= load_addr + load_size))
+                        // // full overlap only for forwarding unlike dependency
+                        // if((store_addr <= load_addr) && (store_addr + store_size >= load_addr + load_size))
+                        if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
                         {
                             //@Vishal: count RAW forwarding
                             sim_RAW_hits++;
@@ -2386,12 +2391,12 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
                     }
                 }                
 
-                // TODO: depend is already part of this set. And dependency is resolved now. So it may not be insert but delete
+                // // TODO: depend is already part of this set. And dependency is resolved now. So it may not be insert but delete
                 // Placement of this clearance was also wrong earlier?
                 // clear dependency bit
-                if (j == (NUM_INSTR_SOURCES - 1))
+                // if (j == (NUM_INSTR_SOURCES - 1))
                     // ROB.entry[rob_index].memory_instrs_depend_on_me.insert(dependent);
-                    ROB.entry[rob_index].memory_instrs_depend_on_me.remove(dependent);
+                    // ROB.entry[rob_index].memory_instrs_depend_on_me.remove(dependent);
             }
         }
     }
