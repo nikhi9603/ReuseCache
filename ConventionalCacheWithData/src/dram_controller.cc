@@ -564,6 +564,8 @@ int MEMORY_CONTROLLER::add_rq(PACKET *packet)
         //if (packet->fill_level < fill_level) {
 
             packet->data = WQ[channel].entry[wq_index].data;
+            // packet->data_value = WQ[channel].entry[wq_index].data_value;
+            memcpy(packet->data_value, WQ[channel].entry[wq_index].data_value, BLOCK_SIZE);
             if (packet->instruction) 
                 upper_level_icache[packet->cpu]->return_data(packet);
             else // data

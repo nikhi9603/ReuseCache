@@ -721,8 +721,13 @@ void print_deadlock(uint32_t i)
     cout << " event: " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].event_cycle;
     cout << " current: " << current_core_cycle[i] << endl;
 
+    cout << "ROB HEAD: head = " << ooo_cpu[i].ROB.head << ", instr_id = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].instr_id << ", ip = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].ip << endl;
+     ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].print();
+    cout << "ROB TAIL: tail = " << ooo_cpu[i].ROB.tail << " , instr_id = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.tail].instr_id << ", ip = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.tail].ip << endl;
+     ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.tail].print();
+
     // print LQ entry
-    cout << endl
+    cout << endl 
          << "Load Queue Entry" << endl;
     for (uint32_t j = 0; j < LQ_SIZE; j++)
     {

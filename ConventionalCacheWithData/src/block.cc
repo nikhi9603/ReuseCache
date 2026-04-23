@@ -128,7 +128,7 @@ void PACKET_QUEUE::remove_queue(PACKET *packet)
         cout << " head: " << head << " tail: " << tail << " occupancy: " << occupancy << " event_cycle: " << packet->event_cycle <<endl;
     }
 #endif
-
+    // packet->free_data();
 
     // reset entry
     PACKET empty_packet;

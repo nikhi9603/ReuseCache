@@ -34,7 +34,7 @@ public:
 
     // replacement state
     uint32_t lru;
-    unsigned char *data_value;
+    unsigned char data_value[64];
     // bool *data_valid;
 
     BLOCK()
@@ -63,7 +63,7 @@ public:
         lru = 0;
         num_uses = 0;
 
-        data_value = new unsigned char[BLOCK_SIZE];
+        // data_value = new unsigned char[BLOCK_SIZE];
         // data_valid = new bool[BLOCK_SIZE];
         for (uint32_t i = 0; i < BLOCK_SIZE; i++)
         {
@@ -160,7 +160,7 @@ public:
         event_cycle,
         cycle_enqueued;
 
-    unsigned char* data_value;
+    unsigned char data_value[64];
     uint8_t data_size;
     uint64_t block_offset;
 
@@ -234,10 +234,21 @@ public:
         full_physical_address = 0;
         send_both_tlb = false;
 
-        data_value = nullptr;
+        // data_value = nullptr;
+        memset(data_value, 0, sizeof(data_value));
         data_size = 0;
         block_offset = 0;
     };
+
+    // void free_data() 
+    // {
+    //     if (data_value) 
+    //     {
+    //         delete[] data_value;
+    //         data_value = nullptr;
+    //     }
+    //     data_size = 0;
+    // }
 };
 
 // packet queue
@@ -415,7 +426,7 @@ public:
 
     uint32_t rob_index, data_index, sq_index;
     uint32_t block_offset, data_size;
-    unsigned char* data_value;
+    unsigned char data_value[64];
 
     uint8_t translated,
         fetched,
@@ -445,7 +456,8 @@ public:
 
         block_offset = 0;
         data_size = 0;
-        data_value = nullptr;
+        // data_value = nullptr;
+        memset(data_value, 0, sizeof(data_value));
 #if 0
         for (uint32_t i=0; i<ROB_SIZE; i++)
             forwarding_depend_on_me[i] = 0;

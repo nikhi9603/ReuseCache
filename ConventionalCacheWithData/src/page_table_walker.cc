@@ -436,6 +436,7 @@ uint64_t PAGE_TABLE_WALKER :: va_to_pa_ptw(uint8_t cpu, uint64_t instr_id, bool 
              vpage = unique_vpage ,
              voffset = unique_va & ((1<<LOG2_PAGE_SIZE) - 1);
 
+    // cout << "Instr id = " << instr_id << " , Unique va: " << hex << unique_va << ", vpage = " << vpage << ", voffset = " << voffset << endl;
     // smart random number generator
     uint64_t random_ppage;
 
@@ -555,9 +556,19 @@ uint64_t PAGE_TABLE_WALKER :: va_to_pa_ptw(uint8_t cpu, uint64_t instr_id, bool 
             }
 
             // insert translation to page tables
-            //printf("Insert  num_adjacent_page: %u  vpage: %lx  ppage: %lx\n", num_adjacent_page, vpage, random_ppage);
+            // cout << "Insert  num_adjacent_page: " << num_adjacent_page << ",  vpage: " << vpage <<  ", ppage: " << random_ppage << endl;
             page_table.insert(make_pair(vpage, random_ppage));
+
+            int i = 0;
+            // cout << "Printing inverse table" << endl;
+            // for (const auto &p : inverse_table) {
+            //     cout << i++ << ": "
+            //         << "ppage=" << hex << p.first
+            //         << ", vpage=" << p.second << endl;
+            // }
+            // cout << "Iteration done" << endl;
             inverse_table.insert(make_pair(random_ppage, vpage));
+            // cout << "Inserted" << endl;
             page_queue.push(vpage);
             previous_ppage = random_ppage;
             num_adjacent_page--;
@@ -612,6 +623,7 @@ uint64_t PAGE_TABLE_WALKER :: va_to_pa_ptw(uint8_t cpu, uint64_t instr_id, bool 
 
 uint64_t PAGE_TABLE_WALKER::map_translation_page(bool *page_swap)
 {
+
     uint64_t physical_address = va_to_pa_ptw(cpu, 0, true , next_translation_virtual_address, next_translation_virtual_address >> LOG2_PAGE_SIZE, page_swap);
     next_translation_virtual_address = ( (next_translation_virtual_address >> LOG2_PAGE_SIZE) + 1 ) << LOG2_PAGE_SIZE;
 

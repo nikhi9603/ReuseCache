@@ -131,7 +131,7 @@ std::vector<std::string> readLabels(std::string& labelFilepath)
 
 int main(int argc, char* argv[])
 {
-    int64_t batchSize = 2;
+    int64_t batchSize = 1;
     bool useCUDA{true};
     const char* useCUDAFlag = "--use_cuda";
     const char* useCPUFlag = "--use_cpu";

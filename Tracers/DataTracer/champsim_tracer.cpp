@@ -11,7 +11,9 @@
 #include <string.h>
 #include <string>
 
-#define NUM_INSTR_DESTINATIONS 2
+using namespace std;
+
+#define NUM_INSTR_DESTINATIONS 4
 #define NUM_INSTR_SOURCES 4
 
 #define SIZE_OF_CALL_INSTRUCTION 5
@@ -94,6 +96,57 @@ INT32 Usage()
     std::cerr << KNOB_BASE::StringKnobSummary() << std::endl;
 
     return -1;
+}
+
+void print_trace_instr(trace_instr_format_t *instr)
+{
+    cout << "IP: 0x" << hex << instr->ip << dec << endl;
+
+    cout << "has_mem: " << ((instr->has_mem_is_branch >> 1) & 1)
+         << ", is_branch: " << (instr->has_mem_is_branch & 1) << endl;
+
+    cout << "branch_taken: " << (int)instr->branch_taken << endl;
+
+    cout << "Destination Registers: ";
+    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+        cout << (int)instr->destination_register[i] << " ";
+    cout << endl;
+
+    cout << "Source Registers: ";
+    for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+        cout << (int)instr->source_register[i] << " ";
+    cout << endl;
+
+    // Memory addresses
+    if (instr->source_memory_address) {
+        cout << "Source Memory Addresses: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << "0x" << hex << instr->source_memory_address[i] << " ";
+        cout << dec << endl;
+    }
+
+    if (instr->destination_memory_address) {
+        cout << "Destination Memory Addresses: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            cout << "0x" << hex << instr->destination_memory_address[i] << " ";
+        cout << dec << endl;
+    }
+
+    // Memory sizes
+    if (instr->source_memory_size) {
+        cout << "Source Memory Sizes: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << (int)instr->source_memory_size[i] << " ";
+        cout << endl;
+    }
+
+    if (instr->destination_memory_size) {
+        cout << "Destination Memory Sizes: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+            cout << (int)instr->destination_memory_size[i] << " ";
+        cout << endl;
+    }
+    cout << "---------------------" << endl;
 }
 
 /* ===================================================================== */
@@ -197,6 +250,8 @@ void EndInstruction()
 
             if (!skip_curr_instr)
             {
+                print_trace_instr(&curr_instr);
+
                 fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
                 fwrite(&curr_instr.has_mem_is_branch, sizeof(unsigned char), 1, out);
                 fwrite(&curr_instr.branch_taken, sizeof(unsigned char), 1, out);
@@ -485,15 +540,15 @@ void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
 
         if (PIN_SafeCopy(curr_instr.destination_memory_value[memoryWriteIndex], addr, write_size) == write_size)
         {
-            if (debug)
-            {
+            // if (debug)
+            // {
                 std::cout << "Obtained memory from " << std::hex << addr << "with value ";
                 for (uint32_t j = 0; j < write_size; j++)
                 {
                     std::cout << std::hex << (int)curr_instr.destination_memory_value[memoryWriteIndex][j];
                 }
                 std::cout << std::dec << std::endl;
-            }
+            // }
         }
         else
         {
@@ -551,13 +606,13 @@ void MemoryWriteValueForCall(uint32_t size_of_call_instruction)
 VOID Instruction(INS ins, VOID *v)
 {
     uint32_t memOperands = INS_MemoryOperandCount(ins);
-    std::cout << std::endl;
-    std::cout << "memOperandscount = " << memOperands << std::endl ;
+    // std::cout << std::endl;
+    // std::cout << "memOperandscount = " << memOperands << std::endl ;
 
     // begin each instruction with this function
     uint32_t opcode = INS_Opcode(ins);
     std::string opcodeStr = INS_Mnemonic(ins);
-    std::cout << "Opcode = " << opcode << " - " << opcodeStr << std::endl;
+    // std::cout << "Opcode = " << opcode << " - " << opcodeStr << std::endl;
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BeginInstruction,
                    IARG_INST_PTR,
                    IARG_UINT32, opcode,
@@ -573,7 +628,7 @@ VOID Instruction(INS ins, VOID *v)
 
     // instrument register reads
     uint32_t readRegCount = INS_MaxNumRRegs(ins);
-    std::cout << "readRegCount = " << readRegCount << std::endl;
+    // std::cout << "readRegCount = " << readRegCount << std::endl;
 
     for (uint32_t i = 0; i < readRegCount; i++)
     {
@@ -587,7 +642,7 @@ VOID Instruction(INS ins, VOID *v)
 
     // instrument register writes
     uint32_t writeRegCount = INS_MaxNumWRegs(ins);
-    std::cout << "writeRegCount = " << readRegCount << std::endl;
+    // std::cout << "writeRegCount = " << readRegCount << std::endl;
 
     for (uint32_t i = 0; i < writeRegCount; i++)
     {
@@ -609,7 +664,7 @@ VOID Instruction(INS ins, VOID *v)
             uint32_t read_size = INS_MemoryOperandSize(ins, memOp);
             if (read_size > MAX_MEMORY_SIZE)
             {
-                std::cout << "MemoryOperand is Read - " << memOp << ", size = " << read_size << std::endl;
+                // std::cout << "MemoryOperand is Read - " << memOp << ", size = " << read_size << std::endl;
                 skip_curr_instr = true;
                 skipInstructionCount++;
                 readSkipInstrCount++;
@@ -635,7 +690,7 @@ VOID Instruction(INS ins, VOID *v)
                 uint32_t write_size = INS_MemoryOperandSize(ins, memOp);
                 if (write_size > MAX_MEMORY_SIZE)
                 {
-                    std::cout << "MemoryOperand is Write - " << memOp << ", size = " << write_size << std::endl;
+                    // std::cout << "MemoryOperand is Write - " << memOp << ", size = " << write_size << std::endl;
                     skip_curr_instr = true;
                     skipInstructionCount++;
                     writeSkipInstrCount++;
@@ -652,7 +707,7 @@ VOID Instruction(INS ins, VOID *v)
             }
             else if (INS_IsCall(ins))
             {
-                std::cout << "MemoryOperand is Write but ISCall - " << memOp << std::endl;
+                // std::cout << "MemoryOperand is Write but ISCall - " << memOp << std::endl;
                 INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryWriteValueForCall, IARG_UINT32, INS_Size(ins),
                                IARG_END);
             }

@@ -25,6 +25,9 @@
 #define BRANCH_OTHER 7
 
 #include "set.h"
+#include<iostream>
+#include <iomanip>
+using namespace std;
 
 class input_instr
 {
@@ -45,8 +48,8 @@ public:
     uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
     uint8_t source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
 
-    unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS]; // output memory values
-    unsigned char *source_memory_value[NUM_INSTR_SOURCES];           // input memory values
+    unsigned char destination_memory_value[NUM_INSTR_DESTINATIONS][64]; // output memory values
+    unsigned char source_memory_value[NUM_INSTR_SOURCES][64];           // input memory values
 
     input_instr()
     {
@@ -59,7 +62,7 @@ public:
             source_registers[i] = 0;
             source_memory[i] = 0;
             source_memory_size[i] = 0;
-            source_memory_value[i] = nullptr;
+            // source_memory_value[i] = nullptr;
         }
 
         for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS; i++)
@@ -67,8 +70,10 @@ public:
             destination_registers[i] = 0;
             destination_memory[i] = 0;
             destination_memory_size[i] = 0;
-            destination_memory_value[i] = nullptr;
+            // destination_memory_value[i] = nullptr;
         }
+        memset(destination_memory_value, 0, sizeof(destination_memory_value));
+        memset(source_memory_value, 0, sizeof(source_memory_value));
     }
 
     static size_t get_basic_size()
@@ -203,8 +208,8 @@ public:
     uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS_SPARC];
     uint8_t source_memory_size[NUM_INSTR_SOURCES];
 
-    unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS_SPARC];
-    unsigned char *source_memory_value[NUM_INSTR_SOURCES];
+    unsigned char destination_memory_value[NUM_INSTR_DESTINATIONS_SPARC][64];
+    unsigned char source_memory_value[NUM_INSTR_SOURCES][64];
 
     // keep around a record of what the original virtual addresses were
     uint64_t destination_virtual_address[NUM_INSTR_DESTINATIONS_SPARC];
@@ -273,6 +278,8 @@ public:
         {
             source_registers[i] = 0;
             source_memory[i] = 0;
+            source_memory_size[i] = 0;
+            // source_memory_value[i] = nullptr;
             source_virtual_address[i] = 0;
             source_added[i] = 0;
             lq_index[i] = UINT32_MAX;
@@ -283,6 +290,8 @@ public:
         for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
         {
             destination_memory[i] = 0;
+            destination_memory_size[i] = 0;
+            // destination_memory_value[i] = nullptr;
             destination_registers[i] = 0;
             destination_virtual_address[i] = 0;
             destination_added[i] = 0;
@@ -290,6 +299,8 @@ public:
             sq_index[i+NUM_INSTR_SOURCES] = UINT32_MAX;
             forwarding_index[i] = 0;
         }
+        memset(source_memory_value, 0, sizeof(source_memory_value));
+        memset(destination_memory_value, 0, sizeof(destination_memory_value));
 
 #if 0
         for (uint32_t i=0; i<ROB_SIZE; i++) {
@@ -301,6 +312,93 @@ public:
         }
 #endif
     };
+
+    void print()
+    {
+        cout << "-------------------" << endl;
+        cout << "IP: 0x" << hex << ip << dec << endl;
+        cout << "Instr_id: " << instr_id << endl;
+
+        cout << "has_mem: " << (int)is_memory
+            << ", is_branch: " << (int)is_branch << endl;
+
+        cout << "branch_taken: " << (int)branch_taken << endl;
+
+        cout << "Destination Registers: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+            cout << (int)destination_registers[i] << " ";
+        cout << endl;
+
+        cout << "Source Registers: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << (int)source_registers[i] << " ";
+        cout << endl;
+
+        // Memory addresses (always print like trace style)
+        cout << "Source Memory Addresses: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << "0x" << hex << source_memory[i] << " ";
+        cout << dec << endl;
+
+        cout << "Destination Memory Addresses: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+            cout << "0x" << hex << destination_memory[i] << " ";
+        cout << dec << endl;
+
+        // Memory sizes
+        cout << "Source Memory Sizes: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << (int)source_memory_size[i] << " ";
+        cout << endl;
+
+        cout << "Destination Memory Sizes: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+            cout << (int)destination_memory_size[i] << " ";
+        cout << endl;
+
+        cout << "Source memory values" << endl;
+        cout << hex;
+        for(int i = 0; i < NUM_INSTR_SOURCES; i++)
+        {
+            for (uint32_t j = 0; j < source_memory_size[i]; j++) {
+                cout << setw(2) << setfill('0')
+                    << (int)source_memory_value[i][j] << " ";
+            }
+            cout << ",  " ;
+        }
+        cout << endl;
+
+        cout << "Destination memory values" << endl;
+        cout << hex;
+        for(int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+        {
+            for (uint32_t j = 0; j < destination_memory_size[i]; j++) {
+                cout << setw(2) << setfill('0')
+                    << (int)destination_memory_value[i][j] << " ";
+            }
+            cout << ",  " ;
+        }
+        cout << endl;
+
+        cout << "---------------------" << endl;
+    }
+
+    // void free_data() 
+    // {
+    //     for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++) {
+    //         if (source_memory_value[i]) {
+    //             delete[] source_memory_value[i];
+    //             source_memory_value[i] = nullptr;
+    //         }
+    //     }
+
+    //     for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++) {
+    //         if (destination_memory_value[i]) {
+    //             delete[] destination_memory_value[i];
+    //             destination_memory_value[i] = nullptr;
+    //         }
+    //     }
+    // }
 };
 
 #endif
