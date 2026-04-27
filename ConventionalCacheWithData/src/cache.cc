@@ -411,7 +411,8 @@ void CACHE::handle_fill()
                     writeback_packet.address = block[set][way].address;
                     writeback_packet.full_addr = block[set][way].full_addr;
                     writeback_packet.data = block[set][way].data;
-                    writeback_packet.instr_id = MSHR.entry[mshr_index].instr_id;
+                    writeback_packet.instr_id = 0;
+                    // cout << __func__ << "mshr instrd id = " << MSHR.entry[mshr_index].instr_id << endl;
                     writeback_packet.ip = 0; // writeback does not have ip
                     writeback_packet.type = WRITEBACK;
                     writeback_packet.event_cycle = current_core_cycle[fill_cpu];
@@ -1014,7 +1015,8 @@ void CACHE::handle_writeback()
                             writeback_packet.address = block[set][way].address;
                             writeback_packet.full_addr = block[set][way].full_addr;
                             writeback_packet.data = block[set][way].data;
-                            writeback_packet.instr_id = WQ.entry[index].instr_id;
+                            writeback_packet.instr_id = 0;
+                            // cout << __func__ << "wq instrd id = " << WQ.entry[index].instr_id << endl;
                             writeback_packet.ip = 0;
                             writeback_packet.type = WRITEBACK;
                             writeback_packet.event_cycle = current_core_cycle[writeback_cpu];
@@ -2062,7 +2064,7 @@ void CACHE::handle_read()
                             }
                             else
                             {
-                                // Neelu: Added to processed queue even on miss for ideal L1 prefetcher, comment if not needed.
+                                // Neelu:f Added to processed queue even on miss for ideal L1 prefetcher, comment if not needed.
 #ifdef PRACTICAL_PERFECT_L1D
                                 if ((cache_type == IS_L1D) && (RQ.entry[index].type != PREFETCH))
                                 {
@@ -3034,6 +3036,8 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     block[set][way].data = packet->data;
     block[set][way].cpu = packet->cpu;
     block[set][way].instr_id = packet->instr_id;
+    // cout << __func__ << "pkt instrd id = " << packet->instr_id << "cache_type: "<< dec << (int)cache_type <<  endl;
+
 
     DP(if (warmup_complete[packet->cpu]) {
                     cout << "[" << NAME << "] " << __func__ << " set: " << set << " way: " << way;

@@ -667,6 +667,11 @@ void finish_warmup()
         ooo_cpu[i].sim_store_gen = 0;
         ooo_cpu[i].sim_store_sent = 0;
 
+        cout << "During warmup: " << endl;
+        cout << "mem instrs: " << ooo_cpu[i].memory_instrs_during_warmup << ", non mem instrs:" << ooo_cpu[i].non_memory_instrs_during_warmup << endl;
+        cout << "num_mem_loads_during_warmup = " << ooo_cpu[i].num_mem_loads_during_warmup << ", num_mem_stores_during_warmup = " << ooo_cpu[i].num_mem_stores_during_warmup << endl;
+        cout << "mem_loads_which_are_forwarded_during_warmup = " <<  ooo_cpu[i].mem_loads_which_are_forwarded_during_warmup << endl;
+
         reset_cache_stats(i, &ooo_cpu[i].ITLB);
         reset_cache_stats(i, &ooo_cpu[i].DTLB);
         reset_cache_stats(i, &ooo_cpu[i].STLB);
@@ -731,7 +736,7 @@ void print_deadlock(uint32_t i)
          << "Load Queue Entry" << endl;
     for (uint32_t j = 0; j < LQ_SIZE; j++)
     {
-        cout << "[LQ] entry: " << j << " instr_id: " << ooo_cpu[i].LQ.entry[j].instr_id << " , virtual_address:" << hex << ooo_cpu[i].LQ.entry[j].virtual_address  <<" , address: " << hex << ooo_cpu[i].LQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].LQ.entry[j].translated << " fetched: " << +ooo_cpu[i].LQ.entry[i].fetched << endl;
+        cout << "[LQ] entry: " << j << " instr_id: " << ooo_cpu[i].LQ.entry[j].instr_id << " , virtual_address:" << hex << ooo_cpu[i].LQ.entry[j].virtual_address  <<" , address: " << hex << ooo_cpu[i].LQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].LQ.entry[j].translated << " fetched: " << +ooo_cpu[i].LQ.entry[j].fetched << ", producer_id: " << +ooo_cpu[i].LQ.entry[j].producer_id << endl;
     }
 
     // print SQ entry
@@ -739,7 +744,8 @@ void print_deadlock(uint32_t i)
          << "Store Queue Entry" << endl;
     for (uint32_t j = 0; j < SQ_SIZE; j++)
     {
-        cout << "[SQ] entry: " << j << " instr_id: " << ooo_cpu[i].SQ.entry[j].instr_id <<  " , virtual_address:" << hex << ooo_cpu[i].LQ.entry[j].virtual_address  <<" , address: " << hex << ooo_cpu[i].SQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].SQ.entry[j].translated << " fetched: " << +ooo_cpu[i].SQ.entry[i].fetched << endl;
+        cout << "[SQ] entry: " << j << " instr_id: " << ooo_cpu[i].SQ.entry[j].instr_id <<  " , virtual_address:" << hex << ooo_cpu[i].SQ.entry[j].virtual_address  <<" , address: " << hex << ooo_cpu[i].SQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].SQ.entry[j].translated << " fetched: " << +ooo_cpu[i].SQ.entry[j].fetched << ", is ROB entry corresponding is_producer: " << +ooo_cpu[i].ROB.entry[ooo_cpu[i].SQ.entry[j].rob_index].is_producer << endl;
+        ooo_cpu[i].ROB.entry[ooo_cpu[i].SQ.entry[j].rob_index].print();
     }
 
     // print L1D MSHR entry
@@ -1773,22 +1779,19 @@ int main(int argc, char **argv)
                 // complete
                 ooo_cpu[i].update_rob();
 
-                // TODO: I think this should be order
-                // execute
-                ooo_cpu[i].execute_instruction();
-
                 // schedule (including decode latency)
                 uint32_t schedule_index = ooo_cpu[i].ROB.next_schedule;
                 if ((ooo_cpu[i].ROB.entry[schedule_index].scheduled == 0) && (ooo_cpu[i].ROB.entry[schedule_index].event_cycle <= current_core_cycle[i]))
                     ooo_cpu[i].schedule_instruction();
+                // execute
+                ooo_cpu[i].execute_instruction();
 
 
                 ooo_cpu[i].update_rob();
 
-                // TODO: I think this should be order
                 // memory operation
-                ooo_cpu[i].execute_memory_instruction();
                 ooo_cpu[i].schedule_memory_instruction();
+                ooo_cpu[i].execute_memory_instruction();
 
                 ooo_cpu[i].update_rob();
 
@@ -1843,9 +1846,9 @@ int main(int argc, char **argv)
                     cumulative_ipc = (1.0 * ooo_cpu[i].num_retired) / current_core_cycle[i];
                 float heartbeat_ipc = (1.0 * ooo_cpu[i].num_retired - ooo_cpu[i].last_sim_instr) / (current_core_cycle[i] - ooo_cpu[i].last_sim_cycle);
 
-                cout << "Heartbeat CPU " << i << " instructions: " << ooo_cpu[i].num_retired << " cycles: " << current_core_cycle[i];
-                cout << " heartbeat IPC: " << heartbeat_ipc << " cumulative IPC: " << cumulative_ipc;
-                cout << " (Simulation time: " << elapsed_hour << " hr " << elapsed_minute << " min " << elapsed_second << " sec) " << endl;
+                cout << "Heartbeat CPU " << i << " instructions: " << dec << ooo_cpu[i].num_retired << " cycles: " << current_core_cycle[i];
+                cout << " heartbeat IPC: " << dec << heartbeat_ipc << " cumulative IPC: " << cumulative_ipc;
+                cout << " (Simulation time: " << dec << elapsed_hour << " hr " << elapsed_minute << " min " << elapsed_second << " sec) " << endl;
                 ooo_cpu[i].next_print_instruction += STAT_PRINTING_PERIOD;
 
                 ooo_cpu[i].last_sim_instr = ooo_cpu[i].num_retired;

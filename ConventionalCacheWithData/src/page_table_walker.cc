@@ -180,6 +180,8 @@ void PAGE_TABLE_WALKER::operate()
             packet.fill_level = FILL_L1; //@Vishal: This packet will be sent from L2 to PTW, TODO: check if this is done or not
             packet.cpu = cpu;
             packet.instr_id = RQ.entry[index].instr_id;
+            // cout << __func__ << "rq instrd id = " << RQ.entry[index].instr_id << endl;
+
             packet.ip = RQ.entry[index].ip; // translation does not have ip
             packet.event_cycle = current_core_cycle[cpu];
             packet.full_virtual_address = RQ.entry[index].full_addr;
@@ -418,9 +420,21 @@ uint64_t PAGE_TABLE_WALKER::handle_page_fault(PAGE_TABLE_PAGE* page, PACKET *pac
 
     //This is done so that latency is added once, not five times
     if (page_swap)
+    {
+        if(warmup_complete[cpu])
+        {
+            cout << "swap latency is used for page fault: pt_level = " << pt_level << ", offset = " << offset << ", next level base addr" <<  page->next_level_base_addr[offset] << endl;
+        }
         stall_cycle[cpu] = current_core_cycle[cpu] + SWAP_LATENCY;
+    }
     else
+    {
+        if(warmup_complete[cpu])
+        {
+            cout << "page table latency is used for page fault: pt_level = " << pt_level << ", offset = " << offset << ", next level base addr" <<  page->next_level_base_addr[offset] << endl;
+        }
         stall_cycle[cpu] = current_core_cycle[cpu] + PAGE_TABLE_LATENCY; 
+    }
 
 }
 
@@ -663,6 +677,7 @@ void PAGE_TABLE_WALKER::fill_mmu_cache(CACHE &cache, uint64_t next_level_base_ad
     cache.MSHR.entry[0].full_addr = get_index(packet->full_virtual_address,cache_type);
     cache.MSHR.entry[0].data = next_level_base_addr;
     cache.MSHR.entry[0].instr_id = packet->instr_id;
+    // cout << __func__ << "mmu instrd id = " << packet->instr_id << endl;
     cache.MSHR.entry[0].ip = 0;
     cache.MSHR.entry[0].type = LOAD_TRANSLATION;
     cache.MSHR.entry[0].event_cycle = current_core_cycle[cpu];

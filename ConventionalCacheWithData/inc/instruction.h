@@ -220,7 +220,8 @@ public:
 
     // these are indices of instructions in the ROB that depend on me
     // uint8_t memory_instrs_depend_on_me[ROB_SIZE];
-    fastset memory_instrs_depend_on_me;
+    fastset memory_instrs_depend_on_me[2*NUM_INSTR_DESTINATIONS_SPARC]; // full overlap loads
+    fastset partial_mem_overlap_instrs_depend_on_me[2*NUM_INSTR_DESTINATIONS_SPARC];
 
     uint32_t lq_index[2*NUM_INSTR_SOURCES],
         sq_index[2*NUM_INSTR_DESTINATIONS_SPARC],

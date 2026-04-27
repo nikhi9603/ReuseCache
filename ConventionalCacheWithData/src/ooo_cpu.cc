@@ -290,6 +290,8 @@ void O3_CPU::read_from_trace()
                 if (instr_unique_id == 0)
                 {
                     current_instr = next_instr = trace_read_instr;
+                    instr_unique_id++;
+                    continue;
                 }
                 else
                 {
@@ -1272,6 +1274,7 @@ void O3_CPU::schedule_instruction()
 
 void O3_CPU::do_scheduling(uint32_t rob_index)
 {
+    // cout << "Scheduling: " << rob_index << endl;
     ROB.entry[rob_index].reg_ready = 1; // reg_ready will be reset to 0 if there is RAW dependency
 
     reg_dependency(rob_index);
@@ -1584,6 +1587,13 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
 {
     uint32_t num_mem_ops = 0, num_added = 0;
 
+    if(ROB.entry[rob_index].instr_id == 0)
+    {
+        cout << "ERROR: CHECL ADD LSQ: INSTRID = 0" << endl;
+        ROB.entry[rob_index].print();
+        assert(0);
+    }
+
     // load
     for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++)
     {
@@ -1672,7 +1682,7 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
             line1_block_offset = addr & BLOCK_OFFSET_MASK;
             line2_block_offset = 0;
 
-                        if(isUnaligned)
+            if(isUnaligned)
             {
                 num_mem_ops += 2;
                 line1_data_size = (uint32_t)(line2_addr - addr);
@@ -1789,7 +1799,14 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
     // LQ.entry[lq_index].data_value = data_value;
     // memcpy(LQ.entry[lq_index].data_value, data_value, data_size); // actually not required, we are just loading from trace but in general lq entry needs to fill this field after execution
     LQ.occupancy++;
-
+    if(warmup_complete[cpu])
+    {
+        // cout << "Adding load: for instr_id = " << LQ.entry[lq_index].instr_id << ", event_cycle = " << LQ.entry[lq_index].event_cycle << ", current cyle = " << current_core_cycle[cpu] << endl;
+    }
+    else
+    {
+        num_mem_loads_during_warmup++;
+    }
     // check RAW dependency
     int prior = rob_index - 1;
     if (prior < 0)
@@ -1803,7 +1820,7 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
             {
                 if (LQ.entry[lq_index].producer_id != UINT64_MAX)
                     break;
-
+                
                 mem_RAW_dependency(i, rob_index, data_index, lq_index);
             }
         }
@@ -1841,18 +1858,19 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
         // if (SQ.entry[i].virtual_address == LQ.entry[lq_index].virtual_address)
 
         // I think equality check is not enough
-        uint64_t store_addr = SQ.entry[i].virtual_address;
-        // uint64_t store_end   = store_start + SQ.entry[i].data_size;
-        uint64_t load_addr  = LQ.entry[lq_index].virtual_address;
-        // uint64_t load_end    = load_start + LQ.entry[lq_index].data_size;
+        uint64_t store_start = SQ.entry[i].virtual_address;
+        uint64_t store_end   = store_start + SQ.entry[i].data_size;
+        uint64_t load_start  = LQ.entry[lq_index].virtual_address;
+        uint64_t load_end    = load_start + LQ.entry[lq_index].data_size;
 
-        //// complete overlap of load in store range
-        // if(store_start <= load_start && store_end >= load_end)
-        if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
+        // overlap of load in store range
+        if(store_start < load_end && load_start < store_end)
+        // if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
         { // store-to-load forwarding check
 
-            // forwarding store is in the SQ
-            if ((rob_index != ROB.head) && (LQ.entry[lq_index].producer_id == SQ.entry[i].instr_id))
+            // forwarding(full overlap) store is in the SQ: partial overlaps gets wakened after sore commit in retire rob
+            if ((rob_index != ROB.head) && (LQ.entry[lq_index].producer_id == SQ.entry[i].instr_id) &&
+                ((store_start <= load_start) && (store_end >= load_end)))
             { // RAW
                 forwarding_index = i;
                 break; // should be break
@@ -1881,8 +1899,8 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
                 LQ.entry[lq_index].fetched = 0;
 
                 // DP(if(warmup_complete[cpu]) {
-                // cout << "[LQ] " << __func__ << " instr_id: " << LQ.entry[lq_index].instr_id << " reset fetched: " << +LQ.entry[lq_index].fetched;
-                // cout << " to obey WAR store instr_id: " << SQ.entry[i].instr_id << " cycle: " << current_core_cycle[cpu] << endl; });
+                // cout << "[LQ] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " reset fetched: " << +LQ.entry[lq_index].fetched;
+                // cout << " to obey WAR store instr_id: " << SQ.entry[i].instr_id << " cycle: " << current_core_cycle[cpu] << endl;
             }
         }
     }
@@ -1916,7 +1934,10 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
             // cout << "[LQ] " << __func__ << " instr_id: " << LQ.entry[lq_index].instr_id << hex;
             // cout << " full_addr: " << LQ.entry[lq_index].physical_address << dec << " is forwarded by store instr_id: ";
             // cout << SQ.entry[forwarding_index].instr_id << " remain_num_ops: " << ROB.entry[fwr_rob_index].num_mem_ops << " cycle: " << current_core_cycle[cpu] << endl; });
-
+            if(!warmup_complete[cpu])
+            {
+                mem_loads_which_are_forwarded_during_warmup++;
+            }
             release_load_queue(lq_index);
         }
         else
@@ -1929,14 +1950,28 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
 
     if (LQ.entry[lq_index].virtual_address && (LQ.entry[lq_index].producer_id == UINT64_MAX))
     { // not released and no forwarding
-        RTL0[RTL0_tail] = lq_index;
-        RTL0_tail++;
-        if (RTL0_tail == LQ_SIZE)
-            RTL0_tail = 0;
+        // RTL0[RTL0_tail] = lq_index;
+        // RTL0_tail++;
+        // if (RTL0_tail == LQ_SIZE)
+        //     RTL0_tail = 0;
+
+        // RTL0 can be removed or safely changed to non-FIFO: using RTL0 tail differently now: starting point to search for insertion
+        uint32_t itr_start = RTL0_tail;
+        uint32_t i = itr_start;
+
+        do{
+            if(RTL0[i] == LQ_SIZE)
+            {
+                RTL0[i] = lq_index;
+                RTL0_tail = (i+1) % LQ_SIZE;
+                break;
+            }
+            i = (i+1) % LQ_SIZE;
+        }while(i != itr_start);
 
         // DP (if (warmup_complete[cpu]) {
-        // cout << "[RTL0] " << __func__ << " instr_id: " << LQ.entry[lq_index].instr_id << " rob_index: " << LQ.entry[lq_index].rob_index << " is added to RTL0";
-        // cout << " head: " << RTL0_head << " tail: " << RTL0_tail << endl; });
+        // cout << "[RTL0] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " rob_index: " << LQ.entry[lq_index].rob_index << " is added to RTL0";
+        // cout << " head: " << RTL0_head << " tail: " << RTL0_tail << endl;
     }
 
     // DP(if(warmup_complete[cpu]) {
@@ -1947,6 +1982,12 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
 
 void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_index, uint32_t lq_index)
 {
+    uint64_t load_addr = LQ.entry[lq_index].virtual_address;
+    uint32_t load_size = LQ.entry[lq_index].data_size;
+
+    uint32_t full_overlap_sq_data_index = UINT32_MAX;
+    uint32_t last_partial_sq_data_index = UINT32_MAX;
+
     for (uint32_t i = 0; i < MAX_INSTR_DESTINATIONS; i++)
     {
         if (ROB.entry[prior].destination_memory[i] == 0)
@@ -1954,29 +1995,96 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
 
         // TODO:: I think this just equality check is wrong 
         // if (ROB.entry[prior].destination_memory[i] == ROB.entry[current].source_memory[data_index])
-        uint64_t store_addr = ROB.entry[prior].destination_memory[i];
-        // uint32_t store_size = ROB.entry[prior].destination_memory_size[i];
+        uint64_t rob_store_addr = ROB.entry[prior].destination_memory[i];
+        uint32_t rob_store_size = ROB.entry[prior].destination_memory_size[i];
+        uint64_t line1_addr = rob_store_addr >> LOG2_BLOCK_SIZE;
+        uint64_t line2_addr = (rob_store_addr+rob_store_size-1) >> LOG2_BLOCK_SIZE;
+        bool isUnaligned = (line1_addr != line2_addr);
+        int num_store_addrs_to_check_with = isUnaligned ? 2 : 1;
 
-        uint64_t load_addr = LQ.entry[lq_index].virtual_address;
-        // uint32_t load_size = ROB.entry[current].source_memory_size[data_index];
+        uint64_t store_addr[2], store_size[2];
+        if(isUnaligned)
+        {
+            store_addr[0] = rob_store_addr;
+            store_size[0] = (line2_addr << LOG2_BLOCK_SIZE) - rob_store_addr;
+
+            store_addr[1] = line2_addr << LOG2_BLOCK_SIZE;
+            store_size[1] = rob_store_size - store_size[0];
+        }
+        else
+        {
+            store_addr[0] = rob_store_addr;
+            store_size[0] = rob_store_size;
+
+            store_addr[1] = 0;
+            store_size[1] = 0;
+        }
+        
+        for(int j = 0; j < num_store_addrs_to_check_with; j++)
+        {
+            // entries may not be added for SQ for prior ROB as it depends on SQ occupancy
+            // uint32_t sq_index = ROB.entry[prior].sq_index[2*i+j];
+            // uint64_t store_addr_j = SQ.entry[sq_index].virtual_address;
+            // uint32_t store_size_j = SQ.entry[sq_index].data_size;
+            uint32_t sq_data_index = 2*i+j;
+            uint64_t store_addr_j = store_addr[j];
+            uint32_t store_size_j = store_size[j];
+
+            //  store-to-load forwarding check
+            bool anyOverlap = ((store_addr_j < load_addr+load_size) && (load_addr < store_addr_j + store_size_j));
+            bool load_fullOverlap = ((store_addr_j <= load_addr) && ((store_addr_j + store_size_j) >= (load_addr + load_size)));
+
+            if(!anyOverlap)
+            {
+                continue;
+            }
+            else if(load_fullOverlap)
+            {
+                full_overlap_sq_data_index = sq_data_index;     // for each rob instr stores, it will be one only ?
+            }
+            else
+            {
+                last_partial_sq_data_index = sq_data_index;
+            }
+        }
 
         // if ((store_addr < load_addr + load_size) && (load_addr < store_addr + store_size))
-        if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
-        { //  store-to-load forwarding check
+        // if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
+        // { //  store-to-load forwarding check
 
             // we need to mark this dependency in the ROB since the producer might not be added in the store queue yet
-            ROB.entry[prior].memory_instrs_depend_on_me.insert(current); // this load cannot be executed until the prior store gets executed
-            ROB.entry[prior].is_producer = 1;
-            LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
-            LQ.entry[lq_index].translated = INFLIGHT;
+            // ROB.entry[prior].memory_instrs_depend_on_me.insert(current); // this load cannot be executed until the prior store gets executed
+            // ROB.entry[prior].is_producer = 1;
+            // LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
+            // LQ.entry[lq_index].translated = INFLIGHT;
 
             // DP (if(warmup_complete[cpu]) {
             // cout << "[LQ] " << __func__ << " RAW producer instr_id: " << ROB.entry[prior].instr_id << " consumer_id: " << ROB.entry[current].instr_id << " lq_index: " << lq_index;
             // cout << hex << " address: " << ROB.entry[prior].destination_memory[i] << dec << endl; });
 
-            return;
-        }
+            // return;
     }
+
+    if(full_overlap_sq_data_index < UINT32_MAX)
+    {
+        // we want to mark dependency for SQ entries but there is no guarantee that SQ entries corresponding to prior rob entry have been added
+        // so instead store at the index of store which load is depend on
+        // and earlier we are storing rob indices, I think its better to store LQ entry index itself
+        ROB.entry[prior].memory_instrs_depend_on_me[full_overlap_sq_data_index].insert(lq_index);
+        ROB.entry[prior].is_producer = 1;
+        LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
+        LQ.entry[lq_index].translated = INFLIGHT;
+        // cout << "full overlap" << endl;
+    }
+    else if(last_partial_sq_data_index < UINT32_MAX)
+    {
+        ROB.entry[prior].partial_mem_overlap_instrs_depend_on_me[last_partial_sq_data_index].insert(lq_index);
+        ROB.entry[prior].is_producer = 1;
+        LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
+        LQ.entry[lq_index].translated = INFLIGHT;
+        cout << "partial overlap" << endl;
+    }
+    return;
 }
 
 void O3_CPU::add_store_queue(uint32_t rob_index, uint32_t data_index, uint64_t address, uint32_t block_offset, uint32_t data_size, uint32_t sq_data_index, unsigned char* data_value)
@@ -1985,6 +2093,17 @@ void O3_CPU::add_store_queue(uint32_t rob_index, uint32_t data_index, uint64_t a
 #ifdef SANITY_CHECK
     if (SQ.entry[sq_index].virtual_address)
         assert(0);
+    if (ROB.entry[rob_index].instr_id == 0)
+    {
+        cerr << "add_store_queue called with instr_id=0, rob_index=" << rob_index << endl;
+        assert(0);
+    }
+    if(address == 0)
+    {
+        cerr << "VA = 0" << endl;
+        ROB.entry[rob_index].print();
+        assert(0);
+    }
 #endif
 
     /*
@@ -2025,13 +2144,22 @@ void O3_CPU::add_store_queue(uint32_t rob_index, uint32_t data_index, uint64_t a
     SQ.tail++;
     if (SQ.tail == SQ.SIZE)
         SQ.tail = 0;
+    
+    if(warmup_complete[cpu])
+    {
+        // cout << "Adding store: for instr_id = " << SQ.entry[sq_index].instr_id << ", event_cycle = " << SQ.entry[sq_index].event_cycle << ", current cyle = " << current_core_cycle[cpu] << endl;
+    }
+    else
+    {
+        num_mem_stores_during_warmup++;
+    }
 
     // like source added, same reason for destination added (one val for each dest is enough)
     // succesfully added to the store queue
     ROB.entry[rob_index].destination_added[data_index] = 1;
 
     STA[STA_head] = UINT64_MAX;
-    // cout << "Added store queue for instr_id: " << hex << SQ.entry[sq_index].instr_id << ", sq_data_index: " << sq_data_index << ", STA_head: " << STA_head << ", val: " << STA[STA_head] << endl;
+    // cout << "Added store queue for instr_id: " << hex << SQ.entry[sq_index].instr_id << ", sq_data_index: " << sq_data_index << ", STA_head: " << STA_head << ", val: " << STA[STA_head] << ", fetched: " << SQ.entry[sq_index].fetched << endl;
     STA_head++;
     if (STA_head == STA_SIZE)
         STA_head = 0;
@@ -2169,11 +2297,14 @@ void O3_CPU::operate_lsq()
 
     //@Vishal: VIPT. Send request to L1D.
 
+    // Changing this into NON FIFO RTL0 : RTL0 head and tail are used differently now
+    // RTL0 head: starting point to iterate over RTL0
+    uint32_t idx = RTL0_head;
     while (load_issued < LQ_WIDTH)
     {
-        if (RTL0[RTL0_head] < LQ_SIZE)
+        if (RTL0[idx] < LQ_SIZE)
         {
-            uint32_t lq_index = RTL0[RTL0_head];
+            uint32_t lq_index = RTL0[idx];
             if (LQ.entry[lq_index].event_cycle <= current_core_cycle[cpu])
             {
 
@@ -2181,26 +2312,26 @@ void O3_CPU::operate_lsq()
 
                 if (rq_index != -2)
                 {
-                    RTL0[RTL0_head] = LQ_SIZE;
-                    RTL0_head++;
-                    if (RTL0_head == LQ_SIZE)
-                        RTL0_head = 0;
-
+                    RTL0[idx] = LQ_SIZE;
+                    // cout << "Ëxecute load in operate lsq called: and rq_index != -2: at RTL0 idx = " << idx << endl; 
                     load_issued++;
                 }
             }
         }
-        else
-        {
-            ////DP (if (warmup_complete[cpu]) {
-            ////cout << "[RTL1] is empty head: " << RTL1_head << " tail: " << RTL1_tail << endl; });
-            break;
-        }
+        // else
+        // {
+        //     ////DP (if (warmup_complete[cpu]) {
+        //     ////cout << "[RTL1] is empty head: " << RTL1_head << " tail: " << RTL1_tail << endl; });
+        //     break;
+        // }
 
+        idx = (idx + 1) % LQ_SIZE;
         num_iteration++;
-        if (num_iteration == (LQ_SIZE - 1))
+        if (num_iteration == LQ_SIZE)
             break;
     }
+    RTL0_head = idx;
+    // cout << "RTL0_head = " << idx << endl;
 
     /*while (load_issued < LQ_WIDTH) {
         if (RTL0[RTL0_head] < LQ_SIZE) {
@@ -2307,49 +2438,23 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
     // cout << " event_cycle: " << SQ.entry[sq_index].event_cycle << endl; });
 
     // resolve RAW dependency after DTLB access
-    // check if this store has dependent loads
+    // check if this store has dependent loads (full-overlap store to load forwarding)
+    int sq_data_index = (ROB.entry[rob_index].sq_index[2*data_index] == sq_index) ? 2*data_index : 2*data_index+1;
+
+    uint64_t store_addr = SQ.entry[sq_index].virtual_address;
+    uint32_t store_size = SQ.entry[sq_index].data_size;
+
     if (ROB.entry[rob_index].is_producer)
     {
-        ITERATE_SET(dependent, ROB.entry[rob_index].memory_instrs_depend_on_me, ROB_SIZE)
+        // cout << "true" << endl;
+        // memory_instrs_depend_on_me have loads with full overlap only
+        ITERATE_SET(lq_index, ROB.entry[rob_index].memory_instrs_depend_on_me[sq_data_index], LQ_SIZE)
         {
-            // check if dependent loads are already added in the load queue
-            for (uint32_t j = 0; j < NUM_INSTR_SOURCES; j++)
-            { // which one is dependent?
-                if (ROB.entry[dependent].source_memory[j] && ROB.entry[dependent].source_added[j])
-                {
-                    // this source memory can have 2 load accesses in case of unaligned. any of them can be dependent
-                    uint64_t dependent_load_addr = ROB.entry[dependent].source_memory[j];
-                    uint32_t dependent_load_size = ROB.entry[dependent].source_memory_size[j];
+            if (LQ.entry[lq_index].virtual_address == 0)
+                continue; // already released in the SQ scan of add_load_queue
 
-                    uint64_t line1 = dependent_load_addr >> LOG2_BLOCK_SIZE;
-                    uint64_t line2 = (dependent_load_addr + dependent_load_size - 1) >> LOG2_BLOCK_SIZE;
-                    uint64_t line2_addr = line2 << LOG2_BLOCK_SIZE;
-                    bool isUnaligned = (dependent_load_size > 0) && (line1 != line2);
-                    int num_of_load_entries = (isUnaligned) ? 2 : 1;
-
-                    // uint32_t line1_data_size, line2_data_size;
-                    // line1_data_size = (isUnaligned) ? (uint32_t)(line2_addr -  dependent_load_addr) : dependent_load_size;
-                    // line2_data_size = dependent_load_size - line1_data_size;
-
-                    // if (ROB.entry[dependent].source_memory[j] == SQ.entry[sq_index].virtual_address)
-                    // { // this is required since a single instruction can issue multiple loads
-                    // // TODO:: I think this just equality check is wrong , may be checking should be done cache line address or completely along with size
-                    uint64_t store_addr = SQ.entry[sq_index].virtual_address;
-                    // uint32_t store_size = SQ.entry[sq_index].data_size;
-                    
-                    for(int i = 0; i < num_of_load_entries; i++)
-                    {
-                        uint32_t idx = 2*j + i;     // to get dependent lq_index 
-                        uint32_t lq_index = ROB.entry[dependent].lq_index[idx];
-                        uint64_t load_addr = LQ.entry[lq_index].virtual_address;
-                        // uint32_t load_size = LQ.entry[lq_index].data_size;
-
-                        // // full overlap only for forwarding unlike dependency
-                        // if((store_addr <= load_addr) && (store_addr + store_size >= load_addr + load_size))
-                        if((store_addr >> LOG2_BLOCK_SIZE) == (load_addr >> LOG2_BLOCK_SIZE))
-                        {
-                            //@Vishal: count RAW forwarding
-                            sim_RAW_hits++;
+            uint64_t load_addr = LQ.entry[lq_index].virtual_address;
+            uint32_t load_size = LQ.entry[lq_index].data_size;
 
     #ifdef SANITY_CHECK
                             if (lq_index >= LQ.SIZE)
@@ -2360,7 +2465,17 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
                                 cerr << " does not match to the store instr_id: " << SQ.entry[sq_index].instr_id << endl;
                                 assert(0);
                             }
+
+                            // full overlap: store completely covers all load bytes
+                            bool full_overlap = (store_addr <= load_addr) &&
+                                                (store_addr + store_size >= load_addr + load_size);
+
+                            if (!full_overlap)
+                                assert(0); // partial overlap — retire_rob handles via partial_overlap_lq
+
     #endif
+            sim_RAW_hits++;
+                            
                             // update correspodning LQ entry
                             // @Vishal: Dependent load can now get the data, translation is not required
                             // LQ.entry[lq_index].physical_address = (SQ.entry[sq_index].physical_address & ~(uint64_t) ((1 << LOG2_BLOCK_SIZE) - 1)) | (LQ.entry[lq_index].virtual_address & ((1 << LOG2_BLOCK_SIZE) - 1));
@@ -2385,19 +2500,17 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
                             // cout << "[LQ3] " << __func__ << " instr_id: " << hex << LQ.entry[lq_index].instr_id ;
                             // cout << " full_addr: " << LQ.entry[lq_index].physical_address << " is forwarded by store instr_id: ";
                             // cout << SQ.entry[sq_index].instr_id << " remain_num_ops: " << ROB.entry[fwr_rob_index].num_mem_ops << " cycle: " << current_core_cycle[cpu] << endl;
-
-                            release_load_queue(lq_index);
-                        }
-                    }
-                }                
-
+                            if(!warmup_complete[cpu])
+                            {
+                                mem_loads_which_are_forwarded_during_warmup++;
+                            }
+                            release_load_queue(lq_index);             
                 // // TODO: depend is already part of this set. And dependency is resolved now. So it may not be insert but delete
                 // Placement of this clearance was also wrong earlier?
                 // clear dependency bit
                 // if (j == (NUM_INSTR_SOURCES - 1))
                     // ROB.entry[rob_index].memory_instrs_depend_on_me.insert(dependent);
                     // ROB.entry[rob_index].memory_instrs_depend_on_me.remove(dependent);
-            }
         }
     }
 }
@@ -2425,6 +2538,7 @@ int O3_CPU::execute_load(uint32_t rob_index, uint32_t lq_index, uint32_t data_in
     data_packet.block_offset = LQ.entry[lq_index].block_offset;
 
     data_packet.instr_id = LQ.entry[lq_index].instr_id;
+    // cout << __func__ << "load instrd id = " << LQ.entry[lq_index].instr_id << endl;
     data_packet.rob_index = LQ.entry[lq_index].rob_index;
     data_packet.ip = LQ.entry[lq_index].ip;
 
@@ -3038,14 +3152,27 @@ void O3_CPU::retire_rob()
         // retire is in-order
         if (ROB.entry[ROB.head].executed != COMPLETED)
         {
+            if(warmup_complete[cpu])
+            {
+                uint8_t exec = ROB.entry[ROB.head].executed;
+                uint8_t sched = ROB.entry[ROB.head].scheduled;
+                int32_t mem_ops = ROB.entry[ROB.head].num_mem_ops;
+
+                if (exec == 0 && sched == 0)
+                    stall_cycles_not_scheduled++;
+                else if (exec == 0 && sched != 0)
+                    stall_cycles_scheduled_not_executed++;
+                else if (exec == INFLIGHT && mem_ops > 0)
+                    stall_cycles_waiting_mem_ops++;
+                else if (exec == INFLIGHT && mem_ops == 0)
+                    stall_cycles_inflight_no_mem_ops++;
+            }
 
             // DP ( if (warmup_complete[cpu]) {
             // cout << "[ROB] " << __func__ << " instr_id: " << ROB.entry[ROB.head].instr_id << " head: " << ROB.head << " is not executed yet" << endl;
             return;
         }
 
-        // cout << "Executing retire rob for n = " << dec << n << ", ROB HEAD IP = " << hex << ROB.entry[ROB.head].ip << ", instr_id: " << ROB.entry[ROB.head].instr_id << endl;
-        // ROB.entry[ROB.head].print();
         // check store instruction
         uint32_t num_store = 0;
         for (uint32_t i = 0; i < MAX_INSTR_DESTINATIONS; i++)
@@ -3103,6 +3230,8 @@ void O3_CPU::retire_rob()
                             data_packet.block_offset = SQ.entry[sq_index].block_offset;
 
                             data_packet.instr_id = SQ.entry[sq_index].instr_id;
+                            // cout << __func__ << "store instrd id = " << SQ.entry[sq_index].instr_id << endl;
+
                             data_packet.rob_index = SQ.entry[sq_index].rob_index;
                             data_packet.ip = SQ.entry[sq_index].ip;
                             data_packet.type = RFO;
@@ -3110,10 +3239,33 @@ void O3_CPU::retire_rob()
                             data_packet.asid[1] = SQ.entry[sq_index].asid[1];
                             data_packet.event_cycle = current_core_cycle[cpu];
 
-                            // cout << "RETIRE ROB DATA PACKET FILLED" << endl;
+                            // cout << "RETIRE ROB D  ATA PACKET FILLED" << endl;
                             L1D.add_wq(&data_packet);
                             // cout << "ADDED PKT TO L1D WQ" << endl;
                             sim_store_sent++;
+
+                            // Wake up partial-overlap loads
+                            ITERATE_SET(lq_idx, ROB.entry[ROB.head].partial_mem_overlap_instrs_depend_on_me[2*i+j], LQ_SIZE)
+                            {
+                                if (LQ.entry[lq_idx].virtual_address == 0)
+                                    continue; // already released // todo:: is it possible?
+                                
+                                LQ.entry[lq_idx].event_cycle = current_core_cycle[cpu];
+
+                                // push to RTL0 non-FIFO
+                                uint32_t itr_start = RTL0_tail;
+                                uint32_t k = itr_start;
+
+                                do{
+                                    if(RTL0[k] == LQ_SIZE)
+                                    {
+                                        RTL0[k] = lq_idx;
+                                        RTL0_tail = (k+1) % LQ_SIZE;
+                                        break;
+                                    }
+                                    k = (k+1) % LQ_SIZE;
+                                }while(k != itr_start);
+                            }
                         }
                     }
                 }
@@ -3158,7 +3310,48 @@ void O3_CPU::retire_rob()
 
         // release ROB entry
         // DP ( if (warmup_complete[cpu]) {
-        // cout << "[ROB] " << __func__ << " instr_id: " << ROB.entry[ROB.head].instr_id << " is retired" << endl; 
+        // cout << "[ROB] " << __func__ << " instr_id: " << hex << ROB.entry[ROB.head].instr_id << " is retired" << endl; 
+        completed_executions--;
+        num_retired++;
+
+        if(!warmup_complete[cpu])
+        {
+            if(ROB.entry[ROB.head].is_memory)
+                memory_instrs_during_warmup++;
+            else
+                non_memory_instrs_during_warmup++;
+        }
+
+        if (warmup_complete[cpu] && num_retired % 1 == 0)
+        {
+            cout << "INTERVAL STATS at " << num_retired << " instructions:" << endl;
+            cout << "  ROB occupancy: " << ROB.occupancy << "/" << ROB.SIZE << endl;
+            cout << "  LQ occupancy: " << LQ.occupancy << "/" << LQ.SIZE << endl;
+            cout << "  SQ occupancy: " << SQ.occupancy << "/" << SQ.SIZE << endl;
+            cout << "  RTL0 entries: ";
+            uint32_t rtl0_count = 0;
+            for (uint32_t i = 0; i < LQ_SIZE; i++)
+                if (RTL0[i] < LQ_SIZE) rtl0_count++;
+            cout << rtl0_count << endl;
+            cout << "Current ROB.head state which is retiring: idx = " << ROB.entry[ROB.head].instr_id << endl;
+            cout << "  ROB head state: executed=" << +ROB.entry[ROB.head].executed
+                << " fetched=" << +ROB.entry[ROB.head].fetched << " scheduled=" << +ROB.entry[ROB.head].scheduled 
+                << " num_mem_ops=" << ROB.entry[ROB.head].num_mem_ops << endl;
+            cout << "  inflight_mem_executions: " << inflight_mem_executions << endl;
+            ROB.entry[ROB.head].print();
+
+            cout << "  sim_RAW_hits: " << sim_RAW_hits << endl;
+
+            cout << "Stall cycles - not scheduled: " << stall_cycles_not_scheduled << endl;
+            cout << "Stall cycles - scheduled not executed: " << stall_cycles_scheduled_not_executed << endl;
+            cout << "Stall cycles - waiting mem ops: " << stall_cycles_waiting_mem_ops << endl;
+            cout << "Stall cycles - inflight no mem ops: " << stall_cycles_inflight_no_mem_ops << endl;
+
+            stall_cycles_not_scheduled = 0;
+            stall_cycles_scheduled_not_executed = 0;
+            stall_cycles_waiting_mem_ops = 0;
+            stall_cycles_inflight_no_mem_ops = 0;
+        }
 
         ooo_model_instr empty_entry;
         // ROB.entry[ROB.head].free_data();
@@ -3168,8 +3361,6 @@ void O3_CPU::retire_rob()
         if (ROB.head == ROB.SIZE)
             ROB.head = 0;
         ROB.occupancy--;
-        completed_executions--;
-        num_retired++;
     }
     // cout << "RetiRE ROB Done" << endl;
 }
