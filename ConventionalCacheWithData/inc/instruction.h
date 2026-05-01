@@ -39,6 +39,8 @@ public:
     uint8_t is_branch;
     uint8_t branch_taken;
 
+    uint8_t instr_size;
+
     uint8_t destination_registers[NUM_INSTR_DESTINATIONS]; // output registers
     uint8_t source_registers[NUM_INSTR_SOURCES];           // input registers
 
@@ -56,6 +58,7 @@ public:
         ip = 0;
         is_branch = 0;
         branch_taken = 0;
+        instr_size = 0;
 
         for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++)
         {
@@ -78,7 +81,7 @@ public:
 
     static size_t get_basic_size()
     {
-        return sizeof(ip) + sizeof(is_branch) + sizeof(branch_taken) +
+        return sizeof(ip) + sizeof(is_branch) + sizeof(branch_taken) + sizeof(instr_size) +
                sizeof(destination_registers) + sizeof(source_registers);
     }
 

@@ -17,6 +17,9 @@
 #include <string>
 #include <vector>
 
+#define PIN_MARKER(id) \
+    asm volatile("mov %0, %%eax; xchg %%bx, %%bx" :: "i"(id) : "eax")
+
 template <typename T>
 T vectorProduct(const std::vector<T>& v)
 {
@@ -131,7 +134,7 @@ std::vector<std::string> readLabels(std::string& labelFilepath)
 
 int main(int argc, char* argv[])
 {
-    int64_t batchSize = 1;
+    int64_t batchSize = 2;
     bool useCUDA{true};
     const char* useCUDAFlag = "--use_cuda";
     const char* useCPUFlag = "--use_cpu";
@@ -252,6 +255,8 @@ int main(int argc, char* argv[])
     std::cout << "Output Type: " << outputType << std::endl;
     std::cout << "Output Dimensions: " << outputDims << std::endl;
 
+    auto t1 = std::chrono::steady_clock::now();
+    PIN_MARKER(1); 
     cv::Mat imageBGR = cv::imread(imageFilepath, cv::ImreadModes::IMREAD_COLOR);
     cv::Mat resizedImageBGR, resizedImageRGB, resizedImage, preprocessedImage;
     cv::resize(imageBGR, resizedImageBGR,
@@ -301,12 +306,23 @@ int main(int argc, char* argv[])
     outputTensors.push_back(Ort::Value::CreateTensor<float>(
         memoryInfo, outputTensorValues.data(), outputTensorSize,
         outputDims.data(), outputDims.size()));
-
+    
+    PIN_MARKER(2);
+    auto t2 = std::chrono::steady_clock::now();
+    std::cout << "Init time: " 
+            << std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count()
+            << " ms" << std::endl;
     std::cout << "Running inference..." << std::endl;
+    PIN_MARKER(3);
     session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
                 inputTensors.data(), 1 /*Number of inputs*/, outputNames.data(),
                 outputTensors.data(), 1 /*Number of outputs*/);
+    PIN_MARKER(4);
     std::cout << "Inference completed." << std::endl;
+    auto t3 = std::chrono::steady_clock::now();
+    std::cout << "First inference time: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(t3-t2).count()
+            << " ms" << std::endl;
 
     std::vector<int> predIds(batchSize, 0);
     std::vector<std::string> predLabels(batchSize);
@@ -342,7 +358,7 @@ int main(int argc, char* argv[])
     std::cout << "Uncalibrated Confidence: " << confidences.at(0) << std::endl;
 
     // Measure latency
-    int numTests{100};
+    int numTests{2};
     std::chrono::steady_clock::time_point begin =
         std::chrono::steady_clock::now();
     for (int i = 0; i < numTests; i++)
@@ -350,6 +366,7 @@ int main(int argc, char* argv[])
         session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
                     inputTensors.data(), 1, outputNames.data(),
                     outputTensors.data(), 1);
+        PIN_MARKER(5);
     }
     std::chrono::steady_clock::time_point end =
         std::chrono::steady_clock::now();

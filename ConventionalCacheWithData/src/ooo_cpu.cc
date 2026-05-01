@@ -819,7 +819,7 @@ void O3_CPU::fetch_instruction()
             // cout << "FETCH:: instr_id:"<< hex << IFETCH_BUFFER.entry[index].instr_id << ", ip =" << IFETCH_BUFFER.entry[index].ip << ", full_virtual_address: " << hex << fetch_packet.full_virtual_address << endl;
             // fetch_packet.data_value = nullptr;
             fetch_packet.data_size = 0;
-            fetch_packet.block_offset = IFETCH_BUFFER.entry[index].ip & BLOCK_OFFSET_MASK;
+            fetch_packet.block_offset = 0;
             fetch_packet.instr_id = 0;
             // Neelu: Is assigning rob_index = 0 going to cause any problems?
             fetch_packet.rob_index = 0;
@@ -2082,7 +2082,7 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
         ROB.entry[prior].is_producer = 1;
         LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
         LQ.entry[lq_index].translated = INFLIGHT;
-        cout << "partial overlap" << endl;
+        // cout << "partial overlap" << endl;
     }
     return;
 }
@@ -3322,36 +3322,36 @@ void O3_CPU::retire_rob()
                 non_memory_instrs_during_warmup++;
         }
 
-        if (warmup_complete[cpu] && num_retired % 1 == 0)
-        {
-            cout << "INTERVAL STATS at " << num_retired << " instructions:" << endl;
-            cout << "  ROB occupancy: " << ROB.occupancy << "/" << ROB.SIZE << endl;
-            cout << "  LQ occupancy: " << LQ.occupancy << "/" << LQ.SIZE << endl;
-            cout << "  SQ occupancy: " << SQ.occupancy << "/" << SQ.SIZE << endl;
-            cout << "  RTL0 entries: ";
-            uint32_t rtl0_count = 0;
-            for (uint32_t i = 0; i < LQ_SIZE; i++)
-                if (RTL0[i] < LQ_SIZE) rtl0_count++;
-            cout << rtl0_count << endl;
-            cout << "Current ROB.head state which is retiring: idx = " << ROB.entry[ROB.head].instr_id << endl;
-            cout << "  ROB head state: executed=" << +ROB.entry[ROB.head].executed
-                << " fetched=" << +ROB.entry[ROB.head].fetched << " scheduled=" << +ROB.entry[ROB.head].scheduled 
-                << " num_mem_ops=" << ROB.entry[ROB.head].num_mem_ops << endl;
-            cout << "  inflight_mem_executions: " << inflight_mem_executions << endl;
-            ROB.entry[ROB.head].print();
+        // if (warmup_complete[cpu] && num_retired % 10000 == 0)
+        // {
+        //     cout << "INTERVAL STATS at " << num_retired << " instructions:" << endl;
+        //     cout << "  ROB occupancy: " << ROB.occupancy << "/" << ROB.SIZE << endl;
+        //     cout << "  LQ occupancy: " << LQ.occupancy << "/" << LQ.SIZE << endl;
+        //     cout << "  SQ occupancy: " << SQ.occupancy << "/" << SQ.SIZE << endl;
+        //     cout << "  RTL0 entries: ";
+        //     uint32_t rtl0_count = 0;
+        //     for (uint32_t i = 0; i < LQ_SIZE; i++)
+        //         if (RTL0[i] < LQ_SIZE) rtl0_count++;
+        //     cout << rtl0_count << endl;
+        //     cout << "Current ROB.head state which is retiring: idx = " << ROB.entry[ROB.head].instr_id << endl;
+        //     cout << "  ROB head state: executed=" << +ROB.entry[ROB.head].executed
+        //         << " fetched=" << +ROB.entry[ROB.head].fetched << " scheduled=" << +ROB.entry[ROB.head].scheduled 
+        //         << " num_mem_ops=" << ROB.entry[ROB.head].num_mem_ops << endl;
+        //     cout << "  inflight_mem_executions: " << inflight_mem_executions << endl;
+        //     ROB.entry[ROB.head].print();
 
-            cout << "  sim_RAW_hits: " << sim_RAW_hits << endl;
+        //     cout << "  sim_RAW_hits: " << sim_RAW_hits << endl;
 
-            cout << "Stall cycles - not scheduled: " << stall_cycles_not_scheduled << endl;
-            cout << "Stall cycles - scheduled not executed: " << stall_cycles_scheduled_not_executed << endl;
-            cout << "Stall cycles - waiting mem ops: " << stall_cycles_waiting_mem_ops << endl;
-            cout << "Stall cycles - inflight no mem ops: " << stall_cycles_inflight_no_mem_ops << endl;
+        //     cout << "Stall cycles - not scheduled: " << stall_cycles_not_scheduled << endl;
+        //     cout << "Stall cycles - scheduled not executed: " << stall_cycles_scheduled_not_executed << endl;
+        //     cout << "Stall cycles - waiting mem ops: " << stall_cycles_waiting_mem_ops << endl;
+        //     cout << "Stall cycles - inflight no mem ops: " << stall_cycles_inflight_no_mem_ops << endl;
 
-            stall_cycles_not_scheduled = 0;
-            stall_cycles_scheduled_not_executed = 0;
-            stall_cycles_waiting_mem_ops = 0;
-            stall_cycles_inflight_no_mem_ops = 0;
-        }
+        //     stall_cycles_not_scheduled = 0;
+        //     stall_cycles_scheduled_not_executed = 0;
+        //     stall_cycles_waiting_mem_ops = 0;
+        //     stall_cycles_inflight_no_mem_ops = 0;
+        // }
 
         ooo_model_instr empty_entry;
         // ROB.entry[ROB.head].free_data();
