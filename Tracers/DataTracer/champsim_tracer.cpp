@@ -46,6 +46,7 @@ typedef struct trace_instr_format
         : ip(0)
         , has_mem_is_branch(0)
         , branch_taken(0)
+        , instr_size(0)
         , destination_memory_address(nullptr)
         , source_memory_address(nullptr)
         , destination_memory_size(nullptr)
@@ -115,14 +116,14 @@ KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "champsim.
 KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "0",
                                   "How many instructions to skip before tracing begins. This wont apply in marker mode");
 
-KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "500000000",
-                                   "How many instructions to trace. If marker mode is enabled and inference pass end is seen within this value number of instructions, tracing is stopped at inference end marker instr else will be tracing will go on till t instrs");
+KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "k", "500000000",
+                                   "How many instructions to trace. If marker mode is enabled and inference pass end is seen within this value number of instructions, tracing is stopped at inference end marker instr else will be tracing will go on till k instrs");
 
 KNOB<bool> KnobEnableTraceWriting(KNOB_MODE_WRITEONCE, "pintool", "w", "1",
                                     "Specify whether traced instructions should be written to your output file or not");
                                 
 KNOB<bool> KnobSetMarkerMode(KNOB_MODE_WRITEONCE, "pintool", "m", "0",
-                                     "Sets the marker mode value. If true, tracer skips instrs till inference start and trace till inference end marker is found. If start is not found within t instrs, all instrs are skipped. If start is found and end is not found within t instrs after start, tracer traces till t instrs after start and stops. Even when mode is set to false, marker related information will be printed as usual");                                   
+                                     "Sets the marker mode value. If true, tracer skips instrs till inference start and trace till inference end marker is found. If start is not found within k instrs, all instrs are skipped. If start is found and end is not found within k instrs after start, tracer traces till k instrs after start and stops. Even when mode is set to false, marker related information will be printed as usual");                                   
 
 /* ===================================================================== */
 // Utilities
@@ -136,7 +137,7 @@ INT32 Usage()
     std::cerr << "This tool creates a register and memory access trace" << std::endl
               << "Specify the output trace file with -o" << std::endl
               << "Specify the number of instructions to skip before tracing with -s" << std::endl
-              << "Specify the number of instructions to trace with -t" << std::endl
+              << "Specify the number of instructions to trace with -k" << std::endl
               << std::endl;
 
     std::cerr << KNOB_BASE::StringKnobSummary() << std::endl;
@@ -232,7 +233,6 @@ void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, uint3
     if (!tracing_on)
         return;
 
-    std::cout << "Begin Instr: " << instrCount << std::endl;
     curr_instr.ip = (unsigned long long int)ip;
     curr_instr.instr_size = (uint8_t) ins_size;
 
@@ -258,8 +258,8 @@ void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, uint3
         curr_instr.source_register[i] = 0;
     }
 
-    if (hasMemory)
-    {
+    // if (hasMemory)
+    // {
         curr_instr.destination_memory_address = new unsigned long long int[NUM_INSTR_DESTINATIONS];
         for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
             curr_instr.destination_memory_address[i] = 0;
@@ -283,17 +283,17 @@ void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, uint3
         curr_instr.source_memory_value = new unsigned char *[NUM_INSTR_SOURCES];
         for (int i = 0; i < NUM_INSTR_SOURCES; i++)
             curr_instr.source_memory_value[i] = nullptr;
-    }
-    else
-    {
-        curr_instr.destination_memory_address = nullptr;
-        curr_instr.destination_memory_size = nullptr;
-        curr_instr.destination_memory_value = nullptr;
+    // }
+    // else
+    // {
+    //     curr_instr.destination_memory_address = nullptr;
+    //     curr_instr.destination_memory_size = nullptr;
+    //     curr_instr.destination_memory_value = nullptr;
 
-        curr_instr.source_memory_address = nullptr;
-        curr_instr.source_memory_size = nullptr;
-        curr_instr.source_memory_value = nullptr;
-    }
+    //     curr_instr.source_memory_address = nullptr;
+    //     curr_instr.source_memory_size = nullptr;
+    //     curr_instr.source_memory_value = nullptr;
+    // }
 
     // memoryWriteIndex = -1;
     for(int i = 0; i < NUM_INSTR_SOURCES + NUM_INSTR_DESTINATIONS; i++)
@@ -336,8 +336,8 @@ void EndInstruction()
 
     if(instrCount > knob_skip_instr_count)
     {
-        tracing_on = true;
-        cout << "Tracing on : " << instrCount << endl;
+        // tracing_on = true;
+        // cout << "Tracing on : " << instrCount << endl;
 
         if ((instrCount - knob_skip_instr_count) % 10000000 == 0)
         {
@@ -369,9 +369,7 @@ void EndInstruction()
             }
 
             for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-            {
-                cout << "Deleting dest mem: idx " << i << endl;
-                
+            {                
                 if (curr_instr.destination_memory_size[i] > MAX_MEMORY_SIZE)
                 {
                     std::cout << "More than MAX_MEMORY_SIZE(" << MAX_MEMORY_SIZE << ") traced. Error!" << std::endl;
@@ -381,16 +379,11 @@ void EndInstruction()
                 {
                     if(KnobEnableTraceWriting.Value())  
                         fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
-                    delete curr_instr.destination_memory_value[i];
-                    curr_instr.destination_memory_value[i] = nullptr;
-                    cout << "Deleted dest mem: idx " << i << endl;
                 }
             }
-            cout << "Deleted dest mem: " << instrCount << endl;
 
             for (int i = 0; i < NUM_INSTR_SOURCES; i++)
             {
-                cout << "Deleting src mem: idx " << i << endl;
                 if (curr_instr.source_memory_size[i] > MAX_MEMORY_SIZE)
                 {
                     std::cout << "More than MAX_MEMORY_SIZE(" << MAX_MEMORY_SIZE << ") traced. Error!" << std::endl;
@@ -401,61 +394,37 @@ void EndInstruction()
                 {
                     if(KnobEnableTraceWriting.Value())      
                         fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
-                    delete curr_instr.source_memory_value[i];
-                    curr_instr.source_memory_value[i] = nullptr;
-                    cout << "Deleted src mem: idx " << i << endl;
                 }
             }
-
-            delete[] curr_instr.destination_memory_address;
-            curr_instr.destination_memory_address = nullptr;
-            delete[] curr_instr.source_memory_address;
-            curr_instr.source_memory_address = nullptr;
-            cout << "Deleted mem addresses " << endl;
-            delete[] curr_instr.destination_memory_size;
-            curr_instr.destination_memory_size = nullptr;
-            delete[] curr_instr.source_memory_size;
-            curr_instr.source_memory_size = nullptr;
         }
         else
         {
-            cout << "Skip Curr instr: " << instrCount << endl;
             skip_curr_instr = false;
-            instrCount--;
-
-            if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
-            {
-                for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-                {
-                    if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
-                    {
-                        delete curr_instr.destination_memory_value[i];
-                        curr_instr.destination_memory_value[i] = nullptr;
-                    }
-                }
-
-                for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-                {
-                    if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
-                    {
-                        delete curr_instr.source_memory_value[i];
-                        curr_instr.source_memory_value[i] = nullptr;
-                    }
-                }
-
-                delete[] curr_instr.destination_memory_address;
-                curr_instr.destination_memory_address = nullptr;
-                delete[] curr_instr.source_memory_address;
-                curr_instr.source_memory_address = nullptr;
-                delete[] curr_instr.destination_memory_size;
-                curr_instr.destination_memory_size = nullptr;
-                delete[] curr_instr.source_memory_size;
-                curr_instr.source_memory_size = nullptr;
-            }
         }
+
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+        {
+            delete[] curr_instr.destination_memory_value[i];
+            curr_instr.destination_memory_value[i] = nullptr;
+        }
+
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+        {
+            delete[] curr_instr.source_memory_value[i];
+            curr_instr.source_memory_value[i] = nullptr;
+        }
+
+        delete[] curr_instr.destination_memory_address;
+        curr_instr.destination_memory_address = nullptr;
+        delete[] curr_instr.source_memory_address;
+        curr_instr.source_memory_address = nullptr;
+        delete[] curr_instr.destination_memory_size;
+        curr_instr.destination_memory_size = nullptr;
+        delete[] curr_instr.source_memory_size;
+        curr_instr.source_memory_size = nullptr;
+
         for(int i = 0; i < NUM_INSTR_SOURCES + NUM_INSTR_DESTINATIONS; i++)
             memOpToDestSlot[i] = -1;
-        std::cout << "End instr done: " << instrCount << std::endl; 
     }
     else
     {
@@ -588,7 +557,7 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
                 }
                 else
                 {
-                    delete curr_instr.source_memory_value[i];
+                    delete[] curr_instr.source_memory_value[i];
                     curr_instr.source_memory_address[i] = 0;
                     curr_instr.source_memory_value[i] = nullptr;
                     curr_instr.source_memory_size[i] = 0;
@@ -671,7 +640,7 @@ void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
         }
         else
         {
-            delete curr_instr.destination_memory_value[memOpToDestSlot[index]];
+            delete[] curr_instr.destination_memory_value[memOpToDestSlot[index]];
             curr_instr.destination_memory_address[memOpToDestSlot[index]] = 0;
             curr_instr.destination_memory_size[memOpToDestSlot[index]] = 0;
             curr_instr.destination_memory_value[memOpToDestSlot[index]] = nullptr;
@@ -715,11 +684,11 @@ void MemoryWriteValueForCall(uint32_t size_of_call_instruction, uint32_t index)
         //     std::cout << "Memory write value for call instruction at 0x" << std::hex << curr_instr.ip
         //               << " with value " << return_address << std::dec << std::endl;
     }
+    else
+    {
+        cout << "Memory write value for call instrumentation failed" << endl;
+    }
 }
-
-/* ===================================================================== */
-// Instrumentation callbacks
-/* ===================================================================== */
 
 // ── xchg bx,bx marker callback ───────────────────────────────────────────
 // Called when Pin detects xchg bx,bx in the application.
@@ -730,16 +699,16 @@ VOID MarkerHit(UINT32 marker_id)
     if (phase_seen[marker_id]) return; // only record first occurrence
 
     phase_seen[marker_id]  = true;
-    phase_instr[marker_id] = instrCount;
+    phase_instr[marker_id] = instrCount + 1;
 
     if(phase_seen[INFERENCE_FIRST_PASS_START])
-        knob_skip_instr_count = instrCount - 1;
+        knob_skip_instr_count = instrCount;
 
     const char* names[] = {"", "PREPROCESSING_START", "PREPROCESSING_END",
                            "INFERENCE_PASS1_START", "INFERENCE_PASS1_END",
                            "INFERENCE_PASS2_END"};
     std::cout << ">>> MARKER " << marker_id << " [" << names[marker_id] << "]"
-              << " at instrCount = " << instrCount << std::endl;    
+              << " at instrCount = " << instrCount + 1 << std::endl;    
 
     if (marker_id == PREPROCESSING_END && phase_seen[PREPROCESSING_START])
     {   
@@ -772,6 +741,11 @@ VOID MarkerHit(UINT32 marker_id)
 //     }
 // }
 
+/* ===================================================================== */
+// Instrumentation callbacks
+/* ===================================================================== */
+
+
 // Is called for every instruction and instruments reads and writes
 VOID Instruction(INS ins, VOID *v)
 {
@@ -790,6 +764,7 @@ VOID Instruction(INS ins, VOID *v)
         // Read marker id from EAX register value at runtime
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MarkerHit,
                        IARG_REG_VALUE, REG_EAX,
+                       IARG_CALL_ORDER, CALL_ORDER_FIRST,
                        IARG_END);
     }
 
@@ -812,7 +787,7 @@ VOID Instruction(INS ins, VOID *v)
                    IARG_UINT32, opcode,
                    IARG_UINT32, memOperands,
                    IARG_UINT32, INS_Size(ins), 
-                   IARG_CALL_ORDER, CALL_ORDER_FIRST,
+                   IARG_CALL_ORDER, CALL_ORDER_FIRST+1,
                    IARG_END);
 
     // instrument branch instructions
@@ -875,6 +850,15 @@ VOID Instruction(INS ins, VOID *v)
 
         if (INS_MemoryOperandIsWritten(ins, memOp))
         {
+            uint32_t write_size = INS_MemoryOperandSize(ins, memOp);
+            if (write_size > MAX_MEMORY_SIZE)
+            {
+                // std::cout << "MemoryOperand is Write - " << memOp << ", size = " << write_size << std::endl;
+                skip_curr_instr = true;
+                skipInstructionCount++;
+                writeSkipInstrCount++;
+                break;
+            }
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)MemoryWriteCaptureAddress,
                            IARG_MEMORYOP_EA, memOp,
                            IARG_UINT32, memOp,
@@ -882,19 +866,6 @@ VOID Instruction(INS ins, VOID *v)
 
             if (INS_HasFallThrough(ins))
             {
-                uint32_t write_size = INS_MemoryOperandSize(ins, memOp);
-                if (write_size > MAX_MEMORY_SIZE)
-                {
-                    // std::cout << "MemoryOperand is Write - " << memOp << ", size = " << write_size << std::endl;
-                    skip_curr_instr = true;
-                    skipInstructionCount++;
-                    writeSkipInstrCount++;
-                    break;
-                }
-                else
-                {
-
-                }
                 INS_InsertCall(ins, IPOINT_AFTER, (AFUNPTR)MemoryWriteCaptureValue,
                                IARG_UINT32, memOp,
                                IARG_UINT32, write_size,

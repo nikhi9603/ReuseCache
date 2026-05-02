@@ -2967,12 +2967,12 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     block[set][way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
     block[set][way].used = 0;
     
-    if(packet->data_size > BLOCK_SIZE)
+    if(packet->is_data == true && packet->data_size > BLOCK_SIZE)
     {
-        cout << "Data size is greater than block size" << endl;
+        cout << "Data size is greater than block size " << dec << (int)packet->data_size << endl;
         assert(0);
     }
-    if (packet->block_offset > BLOCK_SIZE)
+    if (packet->is_data == true&& packet->block_offset > BLOCK_SIZE)
     {
         cout << "Block offset is greater than block size" << endl;
         assert(0);

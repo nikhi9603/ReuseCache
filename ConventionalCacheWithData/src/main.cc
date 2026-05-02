@@ -632,9 +632,9 @@ void finish_warmup()
     elapsed_second -= (elapsed_hour * 3600 + elapsed_minute * 60);
 
     // reset core latency
-    SCHEDULING_LATENCY = 6;
+    SCHEDULING_LATENCY = 2;
     EXEC_LATENCY = 1;
-    DECODE_LATENCY = 2;
+    DECODE_LATENCY = 1;
     PAGE_TABLE_LATENCY = 100;
     SWAP_LATENCY = 100000;
 
@@ -1277,6 +1277,11 @@ int main(int argc, char **argv)
         DRAM_MTPS = DRAM_IO_FREQ / 4;
     else
         DRAM_MTPS = DRAM_IO_FREQ;
+    
+    cout << "dram: " << DRAM_IO_FREQ << endl;
+    cout << "dram-mtps:" << DRAM_MTPS << endl;
+    cout << "pq sizes: " << ITLB_PQ_SIZE << ", " << STLB_PQ_SIZE << endl;
+    cout << "l1i size: " << L1I_SET << ", " << L1I_WAY << endl; 
 
     // DRAM access latency
     tRP = (uint32_t)((1.0 * tRP_DRAM_NANOSECONDS * CPU_FREQ) / 1000);

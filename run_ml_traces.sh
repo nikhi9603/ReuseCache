@@ -56,7 +56,7 @@ generate_trace_and_run() {
     # ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$NORMAL_TRACER" -o "$model_name.champsim.normal.trace" -- build/src/inference --use_cpu $model > /dev/null 2>&1
 
     # not tracing into output data trace file and just doing marker mode
-    ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$DATA_TRACER" -w "0" -m "1" -- build/src/inference --use_cpu $model > "$model_name.marker.debugTrace.txt"
+    ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$DATA_TRACER" -w "0" -m "1" -k "2000000000" -- build/src/inference --use_cpu $model > "$model_name.marker.debugTrace.txt"
     
     # not tracing into output data trace file and no marker mode, just based on -s -t
     # ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$DATA_TRACER" -w "0" -s "100" -t "100" -- build/src/inference --use_cpu $model > "$model_name.non-marker.debugTrace.txt"
@@ -73,10 +73,10 @@ generate_trace_and_run() {
 
     # $CONVENTIONAL_DATA_PROGRAM --warmup_instructions 10000000 --simulation_instructions 200000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output/${model_name}.out" 
     # gdb -ex run -ex bt -ex quit --args $CONVENTIONAL_DATA_PROGRAM \
-    # --warmup_instructions 50000000 \
-    # --simulation_instructions 350000000 \
+    # --warmup_instructions 80000000 \
+    # --simulation_instructions 300000000 \
     # --uncompressed_trace \
-    # -traces "$model_name.champsim.data.trace" > "$model_name-output.txt"
+    # -traces "$model_name.champsim.data.trace" > "$model_name-conventional-output.txt"
     # $REUSE_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
 
     #rm "$model_name.champsim.normal.trace"

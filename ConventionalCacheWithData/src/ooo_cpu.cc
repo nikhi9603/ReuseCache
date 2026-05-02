@@ -1597,7 +1597,7 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
     // load
     for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++)
     {
-        if (ROB.entry[rob_index].source_memory[i])
+        if (ROB.entry[rob_index].source_memory[i] != 0 && ROB.entry[rob_index].source_memory_size[i] != 0)
         {
             // UNALIGNED_ACCESS_MODIFICATION: CHECK FOR UNALIGNED ACCESS
             uint64_t addr = ROB.entry[rob_index].source_memory[i];
@@ -1626,6 +1626,8 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
                 line1_data_size = size;
                 line2_data_size = 0;
             }
+
+            // cout << "data sizes: " << line1_data_size << ", " << line2_data_size << endl;
 
             if (ROB.entry[rob_index].source_added[i])
             {
@@ -1665,7 +1667,7 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
     // store
     for (uint32_t i = 0; i < MAX_INSTR_DESTINATIONS; i++)
     {
-        if (ROB.entry[rob_index].destination_memory[i])
+        if (ROB.entry[rob_index].destination_memory[i] != 0 && ROB.entry[rob_index].destination_memory_size[i] != 0)
         {
             // UNALIGNED_ACCESS_MODIFICATION: CHECK FOR UNALIGNED ACCESS
             uint64_t addr = ROB.entry[rob_index].destination_memory[i];
@@ -1694,6 +1696,7 @@ uint32_t O3_CPU::check_and_add_lsq(uint32_t rob_index)
                 line1_data_size = size;
                 line2_data_size = 0;
             }
+            // cout << "data sizes: " << line1_data_size << ", " << line2_data_size << endl;
 
             if (ROB.entry[rob_index].destination_added[i])
             {  
@@ -1938,6 +1941,19 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
             {
                 mem_loads_which_are_forwarded_during_warmup++;
             }
+            // TODO:: I think I need to remove lq index from memory_instrs_depend_on_me else modify sanity checks in execute store of not strict producer id equals and full overlaps and further lq index element in LQ can be different
+            uint32_t sq_rob_index = SQ.entry[forwarding_index].rob_index;
+            uint32_t sq_entry_dst_idx = SQ.entry[forwarding_index].data_index;
+            int sq_data_index = (ROB.entry[sq_rob_index].sq_index[2*sq_entry_dst_idx] == forwarding_index) ? 2*sq_entry_dst_idx : 2*sq_entry_dst_idx+1;
+
+            ROB.entry[sq_rob_index].memory_instrs_depend_on_me[sq_data_index].remove(lq_index);
+            bool search = ROB.entry[sq_rob_index].memory_instrs_depend_on_me[sq_data_index].search(lq_index);
+
+            if(warmup_complete[cpu])
+            {
+            cout << "lq-sq forwarding: lq-index = " << lq_index << ", sq index = " << forwarding_index << endl;
+            cout << "search value: after removed = " << (int)search << endl;
+            }
             release_load_queue(lq_index);
         }
         else
@@ -1969,9 +1985,10 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
             i = (i+1) % LQ_SIZE;
         }while(i != itr_start);
 
-        // DP (if (warmup_complete[cpu]) {
-        // cout << "[RTL0] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " rob_index: " << LQ.entry[lq_index].rob_index << " is added to RTL0";
-        // cout << " head: " << RTL0_head << " tail: " << RTL0_tail << endl;
+        if (warmup_complete[cpu]) {
+        cout << "[RTL0] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " rob_index: " << LQ.entry[lq_index].rob_index << " is added to RTL0";
+        cout << " head: " << RTL0_head << " tail: " << RTL0_tail << endl;
+        }
     }
 
     // DP(if(warmup_complete[cpu]) {
@@ -2041,6 +2058,12 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
             else if(load_fullOverlap)
             {
                 full_overlap_sq_data_index = sq_data_index;     // for each rob instr stores, it will be one only ?
+                if(warmup_complete[cpu])
+                {
+                    cout << "full-overlappp: " << sq_data_index << ", rob_index: " << prior << ", dst idx: " << i << ", un_idx: " << j << endl;
+                    cout << "load addr = " << load_addr << ", size: " << load_size << endl;
+                    cout << "store addr = " << store_addr << ", size: " << store_size << endl;
+                }
             }
             else
             {
@@ -2074,7 +2097,11 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
         ROB.entry[prior].is_producer = 1;
         LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
         LQ.entry[lq_index].translated = INFLIGHT;
-        // cout << "full overlap" << endl;
+        if(warmup_complete[cpu])
+        {cout << "full overlap" << endl;
+        cout << "lq-index: " << lq_index << ", sq-dat-index =" << full_overlap_sq_data_index << endl;
+        cout << "load addr = " << load_addr << ", size: " << load_size << endl;
+        }
     }
     else if(last_partial_sq_data_index < UINT32_MAX)
     {
@@ -2082,7 +2109,13 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
         ROB.entry[prior].is_producer = 1;
         LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
         LQ.entry[lq_index].translated = INFLIGHT;
-        // cout << "partial overlap" << endl;
+        if(warmup_complete[cpu])
+        {
+        cout << "partial overlap" << endl;
+
+        cout << "lq-index: " << lq_index << ", sq-dat-index =" << last_partial_sq_data_index << endl;
+        cout << "load addr = " << load_addr << ", size: " << load_size << endl;
+        }
     }
     return;
 }
@@ -2456,6 +2489,8 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
             uint64_t load_addr = LQ.entry[lq_index].virtual_address;
             uint32_t load_size = LQ.entry[lq_index].data_size;
 
+            if(warmup_complete[cpu])    cout << "Execute store: sq-index = " << dec << sq_data_index << ", lq-index = " << lq_index << ", sq-rob-index = " << rob_index << endl;
+
     #ifdef SANITY_CHECK
                             if (lq_index >= LQ.SIZE)
                                 assert(0);
@@ -2466,6 +2501,11 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
                                 assert(0);
                             }
 
+                            if(warmup_complete[cpu])
+                            {cout << "lq-producer:id = " << LQ.entry[lq_index].producer_id << ", sq-instr-id:" << SQ.entry[sq_index].instr_id;
+                            cout << "load address: " << load_addr << ", size = " << load_size << endl;
+                            cout << "store-addr: " << store_addr << ", size = " << store_size << endl;
+                            }
                             // full overlap: store completely covers all load bytes
                             bool full_overlap = (store_addr <= load_addr) &&
                                                 (store_addr + store_size >= load_addr + load_size);

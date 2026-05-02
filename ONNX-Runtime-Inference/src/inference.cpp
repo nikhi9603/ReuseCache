@@ -357,23 +357,23 @@ int main(int argc, char* argv[])
     std::cout << "Predicted Label: " << predLabels.at(0) << std::endl;
     std::cout << "Uncalibrated Confidence: " << confidences.at(0) << std::endl;
 
-    // Measure latency
-    int numTests{2};
-    std::chrono::steady_clock::time_point begin =
-        std::chrono::steady_clock::now();
-    for (int i = 0; i < numTests; i++)
-    {
-        session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
-                    inputTensors.data(), 1, outputNames.data(),
-                    outputTensors.data(), 1);
-        PIN_MARKER(5);
-    }
-    std::chrono::steady_clock::time_point end =
-        std::chrono::steady_clock::now();
-    std::cout << "Minimum Inference Latency: "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(end -
-                                                                       begin)
-                         .count() /
-                     static_cast<float>(numTests)
-              << " ms" << std::endl;
+    // // Measure latency
+    // int numTests{2};
+    // std::chrono::steady_clock::time_point begin =
+    //     std::chrono::steady_clock::now();
+    // for (int i = 0; i < numTests; i++)
+    // {
+    //     session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
+    //                 inputTensors.data(), 1, outputNames.data(),
+    //                 outputTensors.data(), 1);
+    //     PIN_MARKER(5);
+    // }
+    // std::chrono::steady_clock::time_point end =
+    //     std::chrono::steady_clock::now();
+    // std::cout << "Minimum Inference Latency: "
+    //           << std::chrono::duration_cast<std::chrono::milliseconds>(end -
+    //                                                                    begin)
+    //                      .count() /
+    //                  static_cast<float>(numTests)
+    //           << " ms" << std::endl;
 }

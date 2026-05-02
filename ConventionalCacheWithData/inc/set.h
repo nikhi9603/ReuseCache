@@ -290,8 +290,9 @@ public:
 			TYPE tmp[SMALL_SIZE];
 			int k = 0;
 			// scan bits low-to-high so tmp[] comes out sorted automatically
-			for (TYPE i = 0; i < MAX_SIZE && k < card; i++)
+			for (TYPE i = 0; i < MAX_SIZE && k < SMALL_SIZE; i++)
 				if (getbit (i)) tmp[k++] = i;
+			card = k;
 			memcpy (data.values, tmp, sizeof (TYPE) * card);
 		}
 	}
