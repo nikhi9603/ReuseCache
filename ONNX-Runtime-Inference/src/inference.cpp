@@ -134,7 +134,7 @@ std::vector<std::string> readLabels(std::string& labelFilepath)
 
 int main(int argc, char* argv[])
 {
-    int64_t batchSize = 2;
+    int64_t batchSize = 1;
     bool useCUDA{true};
     const char* useCUDAFlag = "--use_cuda";
     const char* useCPUFlag = "--use_cpu";
@@ -227,6 +227,8 @@ int main(int argc, char* argv[])
     else
     {
         batchSize = inputDims.at(0);
+        std::cout << "Default batch size. Setting input batch size to "
+                  << batchSize << "." << std::endl;
     }
 
     Ort::AllocatedStringPtr outputNamePtr =
@@ -317,12 +319,12 @@ int main(int argc, char* argv[])
     session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
                 inputTensors.data(), 1 /*Number of inputs*/, outputNames.data(),
                 outputTensors.data(), 1 /*Number of outputs*/);
-    PIN_MARKER(4);
     std::cout << "Inference completed." << std::endl;
     auto t3 = std::chrono::steady_clock::now();
     std::cout << "First inference time: "
             << std::chrono::duration_cast<std::chrono::milliseconds>(t3-t2).count()
             << " ms" << std::endl;
+    PIN_MARKER(4);
 
     std::vector<int> predIds(batchSize, 0);
     std::vector<std::string> predLabels(batchSize);

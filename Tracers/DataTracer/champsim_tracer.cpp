@@ -16,48 +16,61 @@ using namespace std;
 #define NUM_INSTR_DESTINATIONS 4
 #define NUM_INSTR_SOURCES 4
 
-#define SIZE_OF_CALL_INSTRUCTION 5
+// #define SIZE_OF_CALL_INSTRUCTION 5
 #define MAX_MEMORY_SIZE 64
 
 #define debug false
 
 typedef struct trace_instr_format
 {
-    unsigned long long int ip; // instruction pointer (program counter) value
+    uint64_t ip; // instruction pointer (program counter) value
 
-    unsigned char has_mem_is_branch; // does this have memory operands(second bit), is this branch(LSB bit)
-    unsigned char branch_taken;      // if so, is this taken
+    uint8_t has_mem_is_branch; // does this have memory operands(second bit), is this branch(LSB bit)
+    uint8_t branch_taken;      // if so, is this taken
 
     uint8_t instr_size;
 
-    unsigned char destination_register[NUM_INSTR_DESTINATIONS]; // output registers
-    unsigned char source_register[NUM_INSTR_SOURCES];           // input registers
+    uint8_t destination_register[NUM_INSTR_DESTINATIONS]; // output registers
+    uint8_t source_register[NUM_INSTR_SOURCES];           // input registers
 
-    unsigned long long int *destination_memory_address; // output memory
-    unsigned long long int *source_memory_address;      // input memory
+    uint64_t destination_memory_address[NUM_INSTR_DESTINATIONS]; // output memory
+    uint64_t source_memory_address[NUM_INSTR_SOURCES];      // input memory
 
-    uint8_t *destination_memory_size; // output memory sizes
-    uint8_t *source_memory_size;      // input memory sizes
+    uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
+    uint8_t source_memory_size[NUM_INSTR_SOURCES];      // input memory sizes
 
-    unsigned char **destination_memory_value; // output memory values
-    unsigned char **source_memory_value;      // input memory values
+    unsigned char destination_memory_value[NUM_INSTR_DESTINATIONS][MAX_MEMORY_SIZE]; // output memory values
+    unsigned char source_memory_value[NUM_INSTR_SOURCES][MAX_MEMORY_SIZE];      // input memory values
 
     trace_instr_format()
-        : ip(0)
-        , has_mem_is_branch(0)
-        , branch_taken(0)
-        , instr_size(0)
-        , destination_memory_address(nullptr)
-        , source_memory_address(nullptr)
-        , destination_memory_size(nullptr)
-        , source_memory_size(nullptr)
-        , destination_memory_value(nullptr)
-        , source_memory_value(nullptr)
+        : ip(0),
+          has_mem_is_branch(0),
+          branch_taken(0),
+          instr_size(0)
     {
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-            destination_register[i] = 0;
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-            source_register[i] = 0;
+        memset(destination_register, 0,
+               sizeof(destination_register));
+
+        memset(source_register, 0,
+               sizeof(source_register));
+
+        memset(destination_memory_address, 0,
+               sizeof(destination_memory_address));
+
+        memset(source_memory_address, 0,
+               sizeof(source_memory_address));
+
+        memset(destination_memory_size, 0,
+               sizeof(destination_memory_size));
+
+        memset(source_memory_size, 0,
+               sizeof(source_memory_size));
+
+        memset(destination_memory_value, 0,
+               sizeof(destination_memory_value));
+
+        memset(source_memory_value, 0,
+               sizeof(source_memory_value));
     }
 } trace_instr_format_t;
 
@@ -154,6 +167,8 @@ void print_trace_instr(trace_instr_format_t *instr)
 
     cout << "branch_taken: " << (int)instr->branch_taken << endl;
 
+    cout << "Instr_size: " << (int)instr->instr_size << endl;
+
     cout << "Destination Registers: ";
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
         cout << (int)instr->destination_register[i] << " ";
@@ -164,35 +179,30 @@ void print_trace_instr(trace_instr_format_t *instr)
         cout << (int)instr->source_register[i] << " ";
     cout << endl;
 
-    // Memory addresses
-    if (instr->source_memory_address) {
-        cout << "Source Memory Addresses: ";
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+    cout << "Source Memory Addresses: ";
+    for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
+        if (instr->source_memory_size[i] > 0)
             cout << "0x" << hex << instr->source_memory_address[i] << " ";
-        cout << dec << endl;
     }
+    cout << dec << endl;
 
-    if (instr->destination_memory_address) {
-        cout << "Destination Memory Addresses: ";
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+    cout << "Destination Memory Addresses: ";
+    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
+        if (instr->destination_memory_size[i] > 0)
             cout << "0x" << hex << instr->destination_memory_address[i] << " ";
-        cout << dec << endl;
     }
+    cout << dec << endl;
 
-    // Memory sizes
-    if (instr->source_memory_size) {
-        cout << "Source Memory Sizes: ";
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-            cout << (int)instr->source_memory_size[i] << " ";
-        cout << endl;
-    }
+    cout << "Source Memory Sizes: ";
+    for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+        cout << (int)instr->source_memory_size[i] << " ";
+    cout << endl;
 
-    if (instr->destination_memory_size) {
-        cout << "Destination Memory Sizes: ";
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-            cout << (int)instr->destination_memory_size[i] << " ";
-        cout << endl;
-    }
+    cout << "Destination Memory Sizes: ";
+    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
+        cout << (int)instr->destination_memory_size[i] << " ";
+    cout << endl;
+
     cout << "---------------------" << endl;
 }
 
@@ -200,7 +210,7 @@ void print_trace_instr(trace_instr_format_t *instr)
 // Analysis routines
 /* ===================================================================== */
 
-void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, uint32_t ins_size, VOID *opstring)
+void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, uint32_t ins_size)
 {
     instrCount++;
 
@@ -233,7 +243,7 @@ void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, uint3
     if (!tracing_on)
         return;
 
-    curr_instr.ip = (unsigned long long int)ip;
+    curr_instr.ip = (uint64_t)ip;
     curr_instr.instr_size = (uint8_t) ins_size;
 
     bool hasMemory = (numMemOperands != 0);
@@ -248,54 +258,15 @@ void BeginInstruction(VOID *ip, uint32_t op_code, uint32_t numMemOperands, uint3
     }
     curr_instr.branch_taken = 0;
 
-    for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-    {
-        curr_instr.destination_register[i] = 0;
-    }
+    memset(curr_instr.destination_register, 0, sizeof(curr_instr.destination_register));
+    memset(curr_instr.source_register, 0, sizeof(curr_instr.source_register));
+    memset(curr_instr.destination_memory_address, 0, sizeof(curr_instr.destination_memory_address));
+    memset(curr_instr.source_memory_address, 0, sizeof(curr_instr.source_memory_address));
+    memset(curr_instr.destination_memory_size, 0, sizeof(curr_instr.destination_memory_size));
+    memset(curr_instr.source_memory_size, 0, sizeof(curr_instr.source_memory_size));
+    memset(curr_instr.destination_memory_value, 0, sizeof(curr_instr.destination_memory_value));
+    memset(curr_instr.source_memory_value, 0, sizeof(curr_instr.source_memory_value));
 
-    for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-    {
-        curr_instr.source_register[i] = 0;
-    }
-
-    // if (hasMemory)
-    // {
-        curr_instr.destination_memory_address = new unsigned long long int[NUM_INSTR_DESTINATIONS];
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-            curr_instr.destination_memory_address[i] = 0;
-
-        curr_instr.source_memory_address = new unsigned long long int[NUM_INSTR_SOURCES];
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-            curr_instr.source_memory_address[i] = 0;
-
-        curr_instr.destination_memory_size = new uint8_t[NUM_INSTR_DESTINATIONS];
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-            curr_instr.destination_memory_size[i] = 0;
-
-        curr_instr.source_memory_size = new uint8_t[NUM_INSTR_SOURCES];
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-            curr_instr.source_memory_size[i] = 0;
-
-        curr_instr.destination_memory_value = new unsigned char *[NUM_INSTR_DESTINATIONS];
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-            curr_instr.destination_memory_value[i] = nullptr;
-
-        curr_instr.source_memory_value = new unsigned char *[NUM_INSTR_SOURCES];
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-            curr_instr.source_memory_value[i] = nullptr;
-    // }
-    // else
-    // {
-    //     curr_instr.destination_memory_address = nullptr;
-    //     curr_instr.destination_memory_size = nullptr;
-    //     curr_instr.destination_memory_value = nullptr;
-
-    //     curr_instr.source_memory_address = nullptr;
-    //     curr_instr.source_memory_size = nullptr;
-    //     curr_instr.source_memory_value = nullptr;
-    // }
-
-    // memoryWriteIndex = -1;
     for(int i = 0; i < NUM_INSTR_SOURCES + NUM_INSTR_DESTINATIONS; i++)
         memOpToDestSlot[i] = -1;
 }
@@ -313,11 +284,11 @@ void EndInstruction()
     {
         if(KnobSetMarkerMode.Value() == true)
         {
-            knob_trace_instr_count = instrCount - knob_skip_instr_count;
+            knob_trace_instr_count = instrCount - knob_skip_instr_count + 1;
         }
         else
         {
-            knob_trace_instr_count = instrCount - knob_skip_instr_count; // will be equal to KnobTraceInstructions.value()
+            knob_trace_instr_count = instrCount - knob_skip_instr_count + 1; // will be equal to KnobTraceInstructions.value()
         }
 
         tracing_on = false;
@@ -331,14 +302,11 @@ void EndInstruction()
             }
         }
 
-        exit(0);
+        PIN_ExitApplication(0);
     }
 
     if(instrCount > knob_skip_instr_count)
     {
-        // tracing_on = true;
-        // cout << "Tracing on : " << instrCount << endl;
-
         if ((instrCount - knob_skip_instr_count) % 10000000 == 0)
         {
             std::cout << "Traced " << (instrCount - knob_skip_instr_count) << " instructions" << std::endl;
@@ -346,23 +314,22 @@ void EndInstruction()
 
         if (!skip_curr_instr)
         {
-            // if(instrCount < 500010000) print_trace_instr(&curr_instr);
             if(KnobEnableTraceWriting.Value())
             {
-                fwrite(&curr_instr.ip, sizeof(unsigned long long int), 1, out);
-                fwrite(&curr_instr.has_mem_is_branch, sizeof(unsigned char), 1, out);
-                fwrite(&curr_instr.branch_taken, sizeof(unsigned char), 1, out);
+                fwrite(&curr_instr.ip, sizeof(uint64_t), 1, out);
+                fwrite(&curr_instr.has_mem_is_branch, sizeof(uint8_t), 1, out);
+                fwrite(&curr_instr.branch_taken, sizeof(uint8_t), 1, out);
                 fwrite(&curr_instr.instr_size, sizeof(uint8_t), 1, out);
-                fwrite(curr_instr.destination_register, sizeof(unsigned char), NUM_INSTR_DESTINATIONS, out);
-                fwrite(curr_instr.source_register, sizeof(unsigned char), NUM_INSTR_SOURCES, out);
+                fwrite(curr_instr.destination_register, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, out);
+                fwrite(curr_instr.source_register, sizeof(uint8_t), NUM_INSTR_SOURCES, out);
             }
                 
             if ((curr_instr.has_mem_is_branch & 0b00000010) == 2)
             {
                 if(KnobEnableTraceWriting.Value())
                 {
-                    fwrite(curr_instr.destination_memory_address, sizeof(unsigned long long int), NUM_INSTR_DESTINATIONS, out);
-                    fwrite(curr_instr.source_memory_address, sizeof(unsigned long long int), NUM_INSTR_SOURCES, out);
+                    fwrite(curr_instr.destination_memory_address, sizeof(uint64_t), NUM_INSTR_DESTINATIONS, out);
+                    fwrite(curr_instr.source_memory_address, sizeof(uint64_t), NUM_INSTR_SOURCES, out);
                     fwrite(curr_instr.destination_memory_size, sizeof(uint8_t), NUM_INSTR_DESTINATIONS, out);
                     fwrite(curr_instr.source_memory_size, sizeof(uint8_t), NUM_INSTR_SOURCES, out);
                 }
@@ -373,9 +340,9 @@ void EndInstruction()
                 if (curr_instr.destination_memory_size[i] > MAX_MEMORY_SIZE)
                 {
                     std::cout << "More than MAX_MEMORY_SIZE(" << MAX_MEMORY_SIZE << ") traced. Error!" << std::endl;
-                    exit(0);
+                    PIN_ExitApplication(0);
                 }
-                if (curr_instr.destination_memory_size[i] > 0 && curr_instr.destination_memory_value[i] != nullptr)
+                if (curr_instr.destination_memory_size[i] > 0)
                 {
                     if(KnobEnableTraceWriting.Value())  
                         fwrite(curr_instr.destination_memory_value[i], curr_instr.destination_memory_size[i], 1, out);
@@ -387,10 +354,10 @@ void EndInstruction()
                 if (curr_instr.source_memory_size[i] > MAX_MEMORY_SIZE)
                 {
                     std::cout << "More than MAX_MEMORY_SIZE(" << MAX_MEMORY_SIZE << ") traced. Error!" << std::endl;
-                    exit(0);
+                    PIN_ExitApplication(0);
                 }
 
-                if (curr_instr.source_memory_size[i] > 0 && curr_instr.source_memory_value[i] != nullptr)
+                if (curr_instr.source_memory_size[i] > 0)
                 {
                     if(KnobEnableTraceWriting.Value())      
                         fwrite(curr_instr.source_memory_value[i], curr_instr.source_memory_size[i], 1, out);
@@ -401,30 +368,6 @@ void EndInstruction()
         {
             skip_curr_instr = false;
         }
-
-        for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
-        {
-            delete[] curr_instr.destination_memory_value[i];
-            curr_instr.destination_memory_value[i] = nullptr;
-        }
-
-        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
-        {
-            delete[] curr_instr.source_memory_value[i];
-            curr_instr.source_memory_value[i] = nullptr;
-        }
-
-        delete[] curr_instr.destination_memory_address;
-        curr_instr.destination_memory_address = nullptr;
-        delete[] curr_instr.source_memory_address;
-        curr_instr.source_memory_address = nullptr;
-        delete[] curr_instr.destination_memory_size;
-        curr_instr.destination_memory_size = nullptr;
-        delete[] curr_instr.source_memory_size;
-        curr_instr.source_memory_size = nullptr;
-
-        for(int i = 0; i < NUM_INSTR_SOURCES + NUM_INSTR_DESTINATIONS; i++)
-            memOpToDestSlot[i] = -1;
     }
     else
     {
@@ -437,7 +380,7 @@ void EndInstruction()
 
 void BranchOrNot(uint32_t taken)
 {
-    if(!tracing_on)
+    if(!tracing_on || skip_curr_instr)
         return;
     curr_instr.has_mem_is_branch |= 0b00000001;
     if (taken != 0)
@@ -448,7 +391,7 @@ void BranchOrNot(uint32_t taken)
 
 void RegRead(uint32_t i, uint32_t index)
 {
-    if (!tracing_on)
+    if (!tracing_on || skip_curr_instr)
         return;
 
     REG r = (REG)i;
@@ -456,7 +399,7 @@ void RegRead(uint32_t i, uint32_t index)
     int already_found = 0;
     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
     {
-        if (curr_instr.source_register[i] == ((unsigned char)r))
+        if (curr_instr.source_register[i] == ((uint8_t)r))
         {
             already_found = 1;
             break;
@@ -468,7 +411,7 @@ void RegRead(uint32_t i, uint32_t index)
         {
             if (curr_instr.source_register[i] == 0)
             {
-                curr_instr.source_register[i] = (unsigned char)r;
+                curr_instr.source_register[i] = (uint8_t)r;
                 break;
             }
         }
@@ -477,7 +420,7 @@ void RegRead(uint32_t i, uint32_t index)
 
 void RegWrite(REG i, uint32_t index)
 {
-    if (!tracing_on)
+    if (!tracing_on || skip_curr_instr)
         return;
 
     REG r = (REG)i;
@@ -485,7 +428,7 @@ void RegWrite(REG i, uint32_t index)
     int already_found = 0;
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
     {
-        if (curr_instr.destination_register[i] == ((unsigned char)r))
+        if (curr_instr.destination_register[i] == ((uint8_t)r))
         {
             already_found = 1;
             break;
@@ -497,7 +440,7 @@ void RegWrite(REG i, uint32_t index)
         {
             if (curr_instr.destination_register[i] == 0)
             {
-                curr_instr.destination_register[i] = (unsigned char)r;
+                curr_instr.destination_register[i] = (uint8_t)r;
                 break;
             }
         }
@@ -506,13 +449,13 @@ void RegWrite(REG i, uint32_t index)
 
 void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
 {
-    if (!tracing_on)
+    if (!tracing_on || skip_curr_instr)
         return;
 
     bool already_found = false;
     for (int i = 0; i < NUM_INSTR_SOURCES; i++)
     {
-        if ((curr_instr.source_memory_address[i] == ((unsigned long long int)addr)) && (curr_instr.source_memory_size[i] == read_size))
+        if ((curr_instr.source_memory_address[i] == ((uint64_t)addr)) && (curr_instr.source_memory_size[i] == read_size))
         {
             already_found = true;
             break;
@@ -525,9 +468,8 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
         {
             if (curr_instr.source_memory_address[i] == 0)
             {
-                curr_instr.source_memory_address[i] = (unsigned long long int)addr;
+                curr_instr.source_memory_address[i] = (uint64_t)addr;
                 curr_instr.source_memory_size[i] = read_size;
-                curr_instr.source_memory_value[i] = new unsigned char[read_size];
 
                 uint32_t blocksize = 64;
                 uint32_t offset = curr_instr.source_memory_address[i] & (blocksize - 1);
@@ -541,7 +483,7 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
                 }
 
                 if (debug)
-                    std::cout << "Instruction read " << read_size << " bytes at 0x" << std::hex << addr << std::endl;
+                    std::cout << "Instruction read " << read_size << " bytes at 0x" << std::hex << addr << std::dec << std::endl;
 
                 if (PIN_SafeCopy(curr_instr.source_memory_value[i], addr, read_size) == read_size)
                 {
@@ -557,9 +499,7 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
                 }
                 else
                 {
-                    delete[] curr_instr.source_memory_value[i];
                     curr_instr.source_memory_address[i] = 0;
-                    curr_instr.source_memory_value[i] = nullptr;
                     curr_instr.source_memory_size[i] = 0;
 
                     // if (debug)
@@ -574,14 +514,14 @@ void MemoryRead(VOID *addr, uint32_t index, uint32_t read_size)
 
 void MemoryWriteCaptureAddress(VOID *addr, uint32_t index)
 {
-    if (!tracing_on)
+    if (!tracing_on || skip_curr_instr)
         return;
 
     bool already_found = false;
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++)
     {
         // TODO:: I think may not happen?
-        if (curr_instr.destination_memory_address[i] == ((unsigned long long int)addr))
+        if (curr_instr.destination_memory_address[i] == ((uint64_t)addr))
         {
             already_found = true;
             break;
@@ -594,8 +534,7 @@ void MemoryWriteCaptureAddress(VOID *addr, uint32_t index)
         {
             if (curr_instr.destination_memory_address[i] == 0)
             {
-                curr_instr.destination_memory_address[i] = (unsigned long long int)addr;
-                // memoryWriteIndex = i;
+                curr_instr.destination_memory_address[i] = (uint64_t)addr;
                 memOpToDestSlot[index] = i;
                 break;
             }
@@ -605,18 +544,18 @@ void MemoryWriteCaptureAddress(VOID *addr, uint32_t index)
 
 void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
 {
-    if (!tracing_on)
+    if (!tracing_on || skip_curr_instr)
         return;
+    int slot = memOpToDestSlot[index];
 
-    if (memOpToDestSlot[index] != -1)
+    if (slot != -1)
     {
-        curr_instr.destination_memory_size[memOpToDestSlot[index]] = write_size;
-        curr_instr.destination_memory_value[memOpToDestSlot[index]] = new unsigned char[write_size];
-        unsigned long long int *addr = (unsigned long long int *)(curr_instr.destination_memory_address[memOpToDestSlot[index]]);
+        curr_instr.destination_memory_size[slot] = write_size;
+        unsigned char *addr = (unsigned char*)(curr_instr.destination_memory_address[slot]);
 
-        if (curr_instr.destination_memory_address[memOpToDestSlot[index]] != 0 && write_size > 0)
+        if (curr_instr.destination_memory_address[slot] != 0 && write_size > 0)
         {
-            uint32_t offset = curr_instr.destination_memory_address[memOpToDestSlot[index]] & 63;
+            uint32_t offset = curr_instr.destination_memory_address[slot] & 63;
             if (offset + write_size > 64)
             {
                 unalignedAccessCount++;
@@ -626,30 +565,26 @@ void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
         if (debug)
             std::cout << "Instruction wrote " << write_size << " bytes at 0x" << std::hex << addr << std::dec << std::endl;
 
-        if (PIN_SafeCopy(curr_instr.destination_memory_value[memOpToDestSlot[index]], addr, write_size) == write_size)
+        if (PIN_SafeCopy(curr_instr.destination_memory_value[slot], addr, write_size) == write_size)
         {
             if (debug)
             {
                 std::cout << "Obtained memory from " << std::hex << addr << "with value ";
                 for (uint32_t j = 0; j < write_size; j++)
                 {
-                    std::cout << std::hex << (int)curr_instr.destination_memory_value[memOpToDestSlot[index]][j];
+                    std::cout << std::hex << (int)curr_instr.destination_memory_value[slot][j];
                 }
                 std::cout << std::dec << std::endl;
             }
         }
         else
         {
-            delete[] curr_instr.destination_memory_value[memOpToDestSlot[index]];
-            curr_instr.destination_memory_address[memOpToDestSlot[index]] = 0;
-            curr_instr.destination_memory_size[memOpToDestSlot[index]] = 0;
-            curr_instr.destination_memory_value[memOpToDestSlot[index]] = nullptr;
+            curr_instr.destination_memory_address[slot] = 0;
+            curr_instr.destination_memory_size[slot] = 0;
 
             // if (debug)
                 std::cout << "Failed to obtain memory from 0x" << std::hex << addr << std::endl;
         }
-
-        // memoryWriteIndex = -1;
     }
     else
     {
@@ -660,25 +595,15 @@ void MemoryWriteCaptureValue(uint32_t index, uint32_t write_size)
 
 void MemoryWriteValueForCall(uint32_t size_of_call_instruction, uint32_t index)
 {
-    if (!tracing_on)
+    if (!tracing_on || skip_curr_instr)
         return;
 
-    // // TODO:: Check is memoryWriteIndex != -1, does it mean they don't want to consider? If yes, why even handle the case
-    if (memOpToDestSlot[index] != -1)     
-    // {
-    //     curr_instr.destination_memory_size[memoryWriteIndex] = 0;
-    //     curr_instr.destination_memory_value[memoryWriteIndex] = nullptr;
-    //     memoryWriteIndex = -1;
-    // }
-    // else
+    int slot = memOpToDestSlot[index];
+    if (slot != -1)     
     {
-        curr_instr.destination_memory_size[memOpToDestSlot[index]] = 8;
-        curr_instr.destination_memory_value[memOpToDestSlot[index]] = new unsigned char[8];
-        unsigned long long int return_address = curr_instr.ip + size_of_call_instruction;
-        // std::cout << "size of call instruction : " << size_of_call_instruction << std::endl;
-        std::memcpy(curr_instr.destination_memory_value[memOpToDestSlot[index]], &return_address, 8);
-
-        // memoryWriteIndex = -1;
+        curr_instr.destination_memory_size[slot] = 8;
+        uint64_t return_address = curr_instr.ip + size_of_call_instruction;
+        std::memcpy(curr_instr.destination_memory_value[slot], &return_address, 8);
 
         // if (debug)
         //     std::cout << "Memory write value for call instruction at 0x" << std::hex << curr_instr.ip
@@ -688,6 +613,11 @@ void MemoryWriteValueForCall(uint32_t size_of_call_instruction, uint32_t index)
     {
         cout << "Memory write value for call instrumentation failed" << endl;
     }
+}
+
+VOID SetSkipInstruction()
+{
+    skip_curr_instr = true;
 }
 
 // ── xchg bx,bx marker callback ───────────────────────────────────────────
@@ -701,8 +631,11 @@ VOID MarkerHit(UINT32 marker_id)
     phase_seen[marker_id]  = true;
     phase_instr[marker_id] = instrCount + 1;
 
-    if(phase_seen[INFERENCE_FIRST_PASS_START])
+    if(phase_seen[INFERENCE_FIRST_PASS_START] && marker_id == INFERENCE_FIRST_PASS_START)
         knob_skip_instr_count = instrCount;
+    
+    if(phase_seen[INFERENCE_FIRST_PASS_END] && marker_id == INFERENCE_FIRST_PASS_END)
+        knob_trace_instr_count = instrCount + 1 - knob_skip_instr_count;
 
     const char* names[] = {"", "PREPROCESSING_START", "PREPROCESSING_END",
                            "INFERENCE_PASS1_START", "INFERENCE_PASS1_END",
@@ -835,7 +768,9 @@ VOID Instruction(INS ins, VOID *v)
             if (read_size > MAX_MEMORY_SIZE)
             {
                 // std::cout << "MemoryOperand is Read - " << memOp << ", size = " << read_size << std::endl;
-                skip_curr_instr = true;
+                INS_InsertCall(ins, IPOINT_BEFORE,
+                                (AFUNPTR)SetSkipInstruction,
+                                IARG_END);
                 skipInstructionCount++;
                 readSkipInstrCount++;
                 break;
@@ -854,7 +789,9 @@ VOID Instruction(INS ins, VOID *v)
             if (write_size > MAX_MEMORY_SIZE)
             {
                 // std::cout << "MemoryOperand is Write - " << memOp << ", size = " << write_size << std::endl;
-                skip_curr_instr = true;
+                INS_InsertCall(ins, IPOINT_BEFORE,
+                             (AFUNPTR)SetSkipInstruction,
+                            IARG_END);
                 skipInstructionCount++;
                 writeSkipInstrCount++;
                 break;
@@ -911,12 +848,15 @@ VOID Instruction(INS ins, VOID *v)
 VOID Fini(INT32 code, VOID *v)
 {
     // close the file if it hasn't already been closed
-    if (!output_file_closed)
-    {
-        fclose(out);
-        output_file_closed = true;
+    if(KnobEnableTraceWriting.Value() == true)
+    {   if (!output_file_closed)
+        {
+            fclose(out);
+            output_file_closed = true;
+        }
     }
-       std::cout << "\n========== TRACE GENERATION SUMMARY ==========" << std::endl;
+
+    std::cout << "\n========== TRACE GENERATION SUMMARY ==========" << std::endl;
     std::cout << "Total instructions executed:     " << instrCount << std::endl;
     std::cout << "Skip instructions :          " << knob_skip_instr_count << std::endl;
     std::cout << "Trace instructions:         " << knob_trace_instr_count << std::endl;
@@ -943,9 +883,9 @@ VOID Fini(INT32 code, VOID *v)
         UINT64 pass_len = phase_instr[INFERENCE_FIRST_PASS_END] - phase_instr[INFERENCE_FIRST_PASS_START];
         std::cout << "One inference pass instructions: " << pass_len << std::endl;
         std::cout << "\n--- Recommended ChampSim Settings ---" << std::endl;
-        std::cout << "  ChampSim warmup:    " << 0.2 * pass_len
+        std::cout << "  ChampSim warmup:    " << (uint64_t)(0.2 * pass_len)
                   << "  (~20% of one pass)" << std::endl;
-        std::cout << "  ChampSim simulate:  " << 0.8 * pass_len
+        std::cout << "  ChampSim simulate:  " << (uint64_t)(0.8 * pass_len)
                   << "  (remaining 80% of one pass)" << std::endl;
     }
 
