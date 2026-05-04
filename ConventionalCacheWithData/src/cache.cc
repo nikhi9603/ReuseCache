@@ -815,7 +815,10 @@ void CACHE::handle_writeback()
 
             // mark dirty
             block[set][way].dirty = 1;
+            block[set][way].used = 1;
+            block[set][way].num_uses++;
             // block[set][way].data_value = WQ.entry[index].data_value;
+            block[set][way].data = WQ.entry[index].data;
             memcpy(block[set][way].data_value+WQ.entry[index].block_offset, WQ.entry[index].data_value, WQ.entry[index].data_size);
             
 
@@ -1162,6 +1165,7 @@ void CACHE::handle_processed()
                     });
 
                     RQ.entry[rq_index].translated = COMPLETED;
+                    // cout << "translation completed 1" << rq_index << endl;
 
                     if (tlb.cache_type == IS_ITLB)
                     {    
@@ -1170,6 +1174,7 @@ void CACHE::handle_processed()
                     }
                     else
                     {
+                        // cout << "marking lq as translated" << endl;
                         // Neelu: Marking the corresponding LQ entry as translated.
                         ooo_cpu[cpu].LQ.entry[RQ.entry[rq_index].lq_index].translated = COMPLETED;
                         ITERATE_SET(merged, RQ.entry[rq_index].lq_index_depend_on_me, ooo_cpu[cpu].LQ.SIZE)
@@ -1285,9 +1290,9 @@ void CACHE::handle_processed()
                         else
                             RQ.entry[other_rq_index].event_cycle += LATENCY;
 
-                        DP(if (warmup_complete[cpu]) {
-                            cout << "[" << NAME << "_handle_processed] packet: " << RQ.entry[other_rq_index];
-                        });
+                        // DP(if (warmup_complete[cpu]) {
+                            // cout << "[" << NAME << "_handle_processed] packet: " << RQ.entry[other_rq_index];
+                        // });
                     }
                 }
             }
@@ -1443,7 +1448,10 @@ void CACHE::handle_read()
     {
         for (uint32_t rq_index = 0; rq_index < RQ.SIZE; rq_index++)
             if (RQ.entry[rq_index].translated == COMPLETED && (RQ.entry[rq_index].event_cycle <= current_core_cycle[cpu]))
-                reads_ready.insert({RQ.entry[rq_index].event_cycle, rq_index});
+            {
+                    reads_ready.insert({RQ.entry[rq_index].event_cycle, rq_index});
+                    // cout << "reads ready: rq_index = " << rq_index << endl;
+            }
     }
     auto reads_ready_it = reads_ready.begin();
 
@@ -1579,7 +1587,7 @@ void CACHE::handle_read()
                 //         }
                 //     }
                 // }
-
+                // cout << "Read hit " << endl;
                 if (cache_type == IS_ITLB)
                 {
 
@@ -1588,6 +1596,7 @@ void CACHE::handle_read()
                     // RQ.entry[index].event_cycle = current_core_cycle[read_cpu];
                     if (PROCESSED.occupancy < PROCESSED.SIZE)
                         PROCESSED.add_queue(&RQ.entry[index]);
+                    // cout << "Read hit ITLB : index = " << index << endl;
                 }
                 else if (cache_type == IS_DTLB)
                 {
@@ -1600,6 +1609,7 @@ void CACHE::handle_read()
 
                     if (PROCESSED.occupancy < PROCESSED.SIZE)
                         PROCESSED.add_queue(&RQ.entry[index]);
+                    // cout << "Read hit DTLB : index = " << index << endl;
                 }
                 else if (cache_type == IS_STLB)
                 {
@@ -1839,14 +1849,14 @@ void CACHE::handle_read()
                         {
                             RQ.entry[index].data = block[set][way].data;
                             // RQ.entry[index].data_value = block[set][way].data_value;
-                            memcpy(RQ.entry[index].data_value, block[set][way].data_value, BLOCK_SIZE);
+                            memcpy(RQ.entry[index].data_value, block[set][way].data_value + RQ.entry[index].block_offset, RQ.entry[index].data_size);
                             upper_level_icache[read_cpu]->return_data(&RQ.entry[index]);
                         }
                         else // data
                         {
                             RQ.entry[index].data = block[set][way].data;
                             // RQ.entry[index].data_value = block[set][way].data_value;
-                            memcpy(RQ.entry[index].data_value, block[set][way].data_value, BLOCK_SIZE);
+                            memcpy(RQ.entry[index].data_value, block[set][way].data_value + RQ.entry[index].block_offset, RQ.entry[index].data_size);
                             upper_level_dcache[read_cpu]->return_data(&RQ.entry[index]);
                         }
 #ifdef SANITY_CHECK
@@ -1879,7 +1889,7 @@ void CACHE::handle_read()
             }
             else
             { // read miss
-
+                // cout << "Read miss: " << RQ.head << endl;
                 DP(if (warmup_complete[read_cpu]) {
                             cout << "[" << NAME << "] " << __func__ << " read miss";
                             cout << " instr_id: " << RQ.entry[index].instr_id << " address: " << hex << RQ.entry[index].address;
@@ -1899,8 +1909,8 @@ void CACHE::handle_read()
                 if ((mshr_index == -1) && (MSHR.occupancy < MSHR_SIZE))
                 { // this is a new miss
 
-                    if (cache_type == IS_STLB && MSHR.entry[mshr_index].type == TRANSLATION_FROM_L1D)
-                        pf_lower_level++;
+                    // if (cache_type == IS_STLB && MSHR.entry[mshr_index].type == TRANSLATION_FROM_L1D)
+                    //     pf_lower_level++;
 
                     if (cache_type == IS_LLC)
                     {
@@ -2961,11 +2971,15 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     if (block[set][way].prefetch && (block[set][way].used == 0))
         pf_useless++;
 
+    if(block[set][way].valid)
+        num_uses_before_eviction[block[set][way].num_uses]++;
+
     if (block[set][way].valid == 0)
         block[set][way].valid = 1;
     block[set][way].dirty = 0;
     block[set][way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
     block[set][way].used = 0;
+    block[set][way].num_uses = 0;
     
     if(packet->is_data == true && packet->data_size > BLOCK_SIZE)
     {
@@ -3163,6 +3177,8 @@ int CACHE::add_rq(PACKET *packet)
             assert(0);
         }
 
+        if(cache_type != IS_L1D || ((cache_type == IS_L1D) && ((WQ.entry[wq_index].full_virtual_address == packet->full_virtual_address) && WQ.entry[wq_index].data_size == packet->data_size)))
+        {
         // Neelu: 1 cycle WQ forwarding latency added.
         if (packet->event_cycle < current_core_cycle[packet->cpu])
             packet->event_cycle = current_core_cycle[packet->cpu] + 1;
@@ -3175,7 +3191,7 @@ int CACHE::add_rq(PACKET *packet)
 
             packet->data = WQ.entry[wq_index].data;
             // packet->data_value =  WQ.entry[wq_index].data_value;
-            memcpy(packet->data_value, WQ.entry[wq_index].data_value, BLOCK_SIZE);
+            memcpy(packet->data_value, WQ.entry[wq_index].data_value, packet->data_size);
 
             if (fill_level == FILL_L2)
             {
@@ -3217,7 +3233,7 @@ int CACHE::add_rq(PACKET *packet)
             DP(if (warmup_complete[packet->cpu]) {
                             cout << "[" << NAME << "_RQ] " << __func__ << " instr_id: " << packet->instr_id << " found recent writebacks";
                             cout << hex << " read: " << packet->address << " writeback: " << WQ.entry[wq_index].address << dec;
-                            cout << " index: " << MAX_READ << " rob_signal: " << packet->rob_signal << endl; });
+                            cout << " index: " << MAX_READ << endl; });
         }
 
         HIT[packet->type]++;
@@ -3227,6 +3243,16 @@ int CACHE::add_rq(PACKET *packet)
         RQ.ACCESS++;
 
         return -1;
+    }       
+    else
+    {
+        // wrong_partial_overlap_wq_to_rq_forwarding++;
+            // cout << "partial overlap WAR dependency" << "WQ: index = " << wq_index << ", addr = " << hex << WQ.entry[wq_index].full_virtual_address << dec << ", size = " << (int)WQ.entry[wq_index].data_size << ",instr_id = " << WQ.entry[wq_index].instr_id << endl;
+            // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
+        return -2;
+        /// TODO:: otherwise make else case to return -2 till proper store return status is handled by code and not  just retiring without tracking
+            // only l1d cases
+    }        // As of now avoid
     }
 
     // check for duplicates in the read queue
@@ -3471,10 +3497,11 @@ int CACHE::add_rq(PACKET *packet)
             translation_packet.l1_rq_index = index;
             translation_packet.type = LOAD_TRANSLATION;
 
+            // knob cloudsuite rekated changes are not done
             if (knob_cloudsuite)
                 translation_packet.address = ((packet->ip >> LOG2_PAGE_SIZE) << 9) | (256 + packet->asid[0]);
             else
-                translation_packet.address = packet->ip >> LOG2_PAGE_SIZE;
+                translation_packet.address = packet->full_addr >> LOG2_PAGE_SIZE;       // instr pkt to L1I is divided into two if unaligned access: changed from ip to full_addr field
 
             ooo_cpu[packet->cpu].ITLB.add_rq(&translation_packet);
         }
@@ -3573,8 +3600,8 @@ int CACHE::add_wq(PACKET *packet)
 
     if (index != -1)
     {
-
-        if (WQ.entry[index].cpu != packet->cpu)
+        if((cache_type != IS_L1D) || ((cache_type == IS_L1D) && ((WQ.entry[index].full_virtual_address == packet->full_virtual_address) && (WQ.entry[index].data_size == packet->data_size))))
+        {if (WQ.entry[index].cpu != packet->cpu)
         {
             cout << "Write request from CPU " << packet->cpu << " merging with Write request from CPU " << WQ.entry[index].cpu << endl;
             assert(0);
@@ -3584,6 +3611,14 @@ int CACHE::add_wq(PACKET *packet)
         WQ.ACCESS++;
 
         return index; // merged index
+        }
+        else
+        {
+            // waw_count++;
+            // cout << "WAW dependency" << "WQ: index = " << index << ", addr = " << hex << WQ.entry[index].full_virtual_address << dec << ", size = " << (int)WQ.entry[index].data_size <<  ",instr_id = " << WQ.entry[index].instr_id << endl;
+            // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
+            return -2;
+        }
     }
 
     // sanity check

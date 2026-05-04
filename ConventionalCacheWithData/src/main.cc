@@ -154,6 +154,7 @@ void print_energy_profile()
 void print_roi_stats(uint32_t cpu, CACHE *cache)
 {
     uint64_t TOTAL_ACCESS = 0, TOTAL_HIT = 0, TOTAL_MISS = 0, TOTAL_INSTR_MISS = 0;
+    uint64_t DEMAND_ACCESS = 0, DEMAND_HIT = 0, DEMAND_MISS = 0;
 
     for (uint32_t i = 0; i < NUM_TYPES; i++)
     {
@@ -163,12 +164,22 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         TOTAL_INSTR_MISS += cache->roi_instr_miss[cpu][i];
     }
 
+    DEMAND_ACCESS = cache->roi_access[cpu][LOAD] + cache->roi_access[cpu][RFO];
+    DEMAND_HIT = cache->roi_hit[cpu][LOAD] + cache->roi_hit[cpu][RFO];
+    DEMAND_MISS = cache->roi_miss[cpu][LOAD] + cache->roi_miss[cpu][RFO];
+
     uint64_t num_instrs = ooo_cpu[cpu].finish_sim_instr;
 
     if (TOTAL_ACCESS != 0)
     {
         cout << cache->NAME;
         cout << " TOTAL     ACCESS: " << setw(10) << TOTAL_ACCESS << "  HIT: " << setw(10) << TOTAL_HIT << "  MISS: " << setw(10) << TOTAL_MISS << "  HIT %: " << setw(10) << ((double)TOTAL_HIT * 100 / TOTAL_ACCESS) << "  MISS %: " << setw(10) << ((double)TOTAL_MISS * 100 / TOTAL_ACCESS) << "   MPKI: " << ((double)TOTAL_MISS * 1000 / num_instrs) << endl;
+    }
+
+    if (DEMAND_ACCESS != 0)
+    {
+        cout << cache->NAME;
+        cout << " DEMAND     ACCESS: " << setw(10) << DEMAND_ACCESS << "  HIT: " << setw(10) << DEMAND_HIT << "  MISS: " << setw(10) << DEMAND_MISS << "  HIT %: " << setw(10) << ((double)DEMAND_HIT * 100 / DEMAND_ACCESS) << "  MISS %: " << setw(10) << ((double)DEMAND_MISS * 100 / DEMAND_ACCESS) << "   MPKI: " << ((double)DEMAND_MISS * 1000 / num_instrs) << endl;
     }
 
     if (cache->cache_type == IS_BTB)
@@ -239,8 +250,8 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         cout << cache->NAME;
         cout << " TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->roi_access[cpu][6] << "  HIT: " << setw(10) << cache->roi_hit[cpu][6] << "  MISS: " << setw(10) << cache->roi_miss[cpu][6] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][6] * 100 / cache->roi_access[cpu][6]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][6] * 100 / cache->roi_access[cpu][6]) << "   MPKI: " << ((double)cache->roi_miss[cpu][6] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
     }
-    // if(cache->pf_requested)
-    //{
+    if(cache->pf_requested)
+    {
     cout << cache->NAME;
     cout << " PREFETCH  REQUESTED: " << setw(10) << cache->pf_requested << "  ISSUED: " << setw(10) << cache->pf_issued;
     cout << "  USEFUL: " << setw(10) << cache->pf_useful << "  USELESS: " << setw(10) << cache->pf_useless << endl;
@@ -251,16 +262,17 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
     cout << cache->NAME << " TIMELY PREFETCHES: " << setw(10) << cache->pf_useful << " LATE PREFETCHES: " << cache->pf_late << " DROPPED PREFETCHES: " << cache->pf_dropped << endl;
     // cout << cache->NAME << " PREFETCHES SAME FILL-ORIGIN LEVEL: " << cache->pf_same_fill_level << " DIFFERENT FILL-ORIGIN LEVEL: " << cache->pf_lower_fill_level << endl;
 
-    //}
     cout << cache->NAME << " PREFETCHES SAME FILL-ORIGIN LEVEL: " << cache->pf_same_fill_level << " DIFFERENT FILL-ORIGIN LEVEL: " << cache->pf_lower_fill_level << endl;
-
+    }
     if (cache->cache_type == IS_PSCL5 || cache->cache_type == IS_PSCL4 || cache->cache_type == IS_PSCL3 || cache->cache_type == IS_PSCL2)
     {
     }
     else
     {
         cout << cache->NAME;
-        cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
+        // cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
+        cout << " AVERAGE MISS LATENCY: (DEMAND MISSES ONLY)" << (1.0 * (cache->total_miss_latency)) / DEMAND_MISS << " cycles" << endl;
+        // As of now total miss latency is being incremented only in case of demand misses
     }
 
     //@Vishal: Will work only for 1 core, for multi-core this will give sim_result not roi_result
@@ -316,26 +328,32 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         cout << cache->NAME << " Dense regions hint to LLC: " << cache->sending_hint_to_llc << endl;
         // iterate over num_uses_before_eviction map"
         cout << endl;
-        
-        for(int i = 0; i < cache->NUM_SET; i++)
-        {
-            for(int j = 0; j < cache->NUM_WAY; j++)
-            {
-                if(cache->block[i][j].valid == 1)
-                {
-                    cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
-                }
-            }
-        }
-        
-        cout << "In LLC: " << endl;
-        int totalLines = 0;
+
+        cout << "LLC_EVICTED_BLOCKS_NUM_USES_START" << endl;
+        int evicted_total = 0;
         for (auto &use : cache->num_uses_before_eviction)
         {
-            cout << use.second << " lines used " << use.first << " times before eviction" << endl;
-            totalLines += use.second;
+            cout << "LLC_EVICTED num_uses: " << use.first << " count: " << use.second << endl;
+            evicted_total += use.second;
         }
-        cout << "Total lines: " << totalLines << endl;
+        cout << "LLC_EVICTED_TOTAL: " << evicted_total << endl;
+        cout << "LLC_EVICTED_BLOCKS_NUM_USES_END" << endl;
+
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_START" << endl;
+        map<uint32_t, uint32_t> resident_uses;
+        for(int i = 0; i < cache->NUM_SET; i++)
+            for(int j = 0; j < cache->NUM_WAY; j++)
+                if(cache->block[i][j].valid == 1)
+                    resident_uses[cache->block[i][j].num_uses]++;
+
+        int resident_total = 0;
+        for (auto &use : resident_uses)
+        {
+            cout << "LLC_RESIDENT num_uses: " << use.first << " count: " << use.second << endl;
+            resident_total += use.second;
+        }
+        cout << "LLC_RESIDENT_TOTAL: " << resident_total << endl;
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_END" << endl;
     }
     static int flag = 0;
 #ifdef PUSH_DTLB_PB
@@ -495,11 +513,11 @@ void reset_cache_stats(uint32_t cpu, CACHE *cache)
     cache->PQ.FORWARD = 0;
     cache->PQ.FULL = 0;
 
-    for(auto &num_uses: cache->num_uses_before_eviction)
-    {
-        num_uses.second = 0;
-    }
-
+    // for(auto &num_uses: cache->num_uses_before_eviction)
+    // {
+    //     num_uses.second = 0;
+    // }
+    cache->num_uses_before_eviction.clear();
     for(int i = 0; i < cache->NUM_SET; i++)
     {
         for(int j = 0; j < cache->NUM_WAY; j++)
@@ -593,25 +611,25 @@ void print_llc_warmup_stats(uint32_t cpu, CACHE *cache)
             cout << " WARMUP TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->roi_access[cpu][6] << "  HIT: " << setw(10) << cache->roi_hit[cpu][6] << "  MISS: " << setw(10) << cache->roi_miss[cpu][6] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][6] * 100 / cache->roi_access[cpu][6]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][6] * 100 / cache->roi_access[cpu][6]) << "   MPKI: " << ((double)cache->roi_miss[cpu][6] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
         }
 
-        for(int i = 0; i < cache->NUM_SET; i++)
-        {
-            for(int j = 0; j < cache->NUM_WAY; j++)
-            {
-                if(cache->block[i][j].valid == 1)
-                {
-                    cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
-                }
-            }
-        }
+        // for(int i = 0; i < cache->NUM_SET; i++)
+        // {
+        //     for(int j = 0; j < cache->NUM_WAY; j++)
+        //     {
+        //         if(cache->block[i][j].valid == 1)
+        //         {
+        //             cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
+        //         }
+        //     }
+        // }
 
-        std::cout << "In Conventional Cache by the end of warmup:" << std::endl;
-        int totalLines = 0;
-        for (auto &use : cache->num_uses_before_eviction)
-        {
-            totalLines += use.second;
-            std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
-        }
-        std::cout << "Total number of lines: " << totalLines << std::endl;
+        // std::cout << "In Conventional Cache by the end of warmup:" << std::endl;
+        // int totalLines = 0;
+        // for (auto &use : cache->num_uses_before_eviction)
+        // {
+        //     totalLines += use.second;
+        //     std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
+        // }
+        // std::cout << "Total number of lines: " << totalLines << std::endl;
 
         for (uint32_t i = 0; i < NUM_TYPES; i++)
         {
@@ -666,6 +684,7 @@ void finish_warmup()
         ooo_cpu[i].sim_load_sent = 0;
         ooo_cpu[i].sim_store_gen = 0;
         ooo_cpu[i].sim_store_sent = 0;
+        ooo_cpu[i].sim_partial_RAW_hits = 0;
 
         cout << "During warmup: " << endl;
         cout << "mem instrs: " << ooo_cpu[i].memory_instrs_during_warmup << ", non mem instrs:" << ooo_cpu[i].non_memory_instrs_during_warmup << endl;
@@ -1920,6 +1939,7 @@ int main(int argc, char **argv)
                 ooo_cpu[i].roi_load_sent = ooo_cpu[i].sim_load_sent;
                 ooo_cpu[i].roi_store_gen = ooo_cpu[i].sim_store_gen;
                 ooo_cpu[i].roi_store_sent = ooo_cpu[i].sim_store_sent;
+                ooo_cpu[i].roi_partial_RAW_hits = ooo_cpu[i].sim_partial_RAW_hits;
 
                 record_roi_stats(i, &ooo_cpu[i].ITLB);
                 record_roi_stats(i, &ooo_cpu[i].DTLB);
@@ -2014,6 +2034,7 @@ int main(int argc, char **argv)
             //@Vishal: print stats
             cout << endl;
             cout << "RAW hits: " << ooo_cpu[i].sim_RAW_hits << endl;
+            cout << "Partial RAW hits: " << ooo_cpu[i].sim_partial_RAW_hits << endl;
             cout << "Loads Generated: " << ooo_cpu[i].sim_load_gen << endl;
             cout << "Loads sent to L1D: " << ooo_cpu[i].sim_load_sent << endl;
             cout << "Stores Generated: " << ooo_cpu[i].sim_store_gen << endl;

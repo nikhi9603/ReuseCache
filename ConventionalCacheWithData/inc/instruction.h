@@ -149,42 +149,44 @@ class ooo_model_instr
 public:
     uint64_t instr_id,
         ip,
-        fetch_producer,
+        // fetch_producer,
         producer_id,
-        translated_cycle,
-        fetched_cycle,
-        execute_begin_cycle,
-        retired_cycle,
-        event_cycle,
-        stall_begin_cycle, // Neelu: Adding to count number of stall cycles in ROB
-        load_stall_begin_cycle,
-        stall_begin_rob_occupancy; // Neelu: Adding to capture ROB occupancy at stall start.
+        // translated_cycle,
+        // fetched_cycle,
+        // execute_begin_cycle,
+        // retired_cycle,
+        event_cycle;
+        // stall_begin_cycle, // Neelu: Adding to count number of stall cycles in ROB
+        // load_stall_begin_cycle,
+        // stall_begin_rob_occupancy; // Neelu: Adding to capture ROB occupancy at stall start.
 
     uint8_t is_branch,
         is_memory,
         branch_taken,
+        instr_size,
         branch_mispredicted,
-        branch_prediction_made,
+        // branch_prediction_made,
         translated,
-        data_translated,
+        // data_translated,
         source_added[NUM_INSTR_SOURCES],
         destination_added[NUM_INSTR_DESTINATIONS_SPARC],
         is_producer,
         is_consumer,
         reg_RAW_producer,
         reg_ready,
-        mem_ready,
+        // mem_ready,
         asid[2],
         reg_RAW_checked[NUM_INSTR_SOURCES],
-        stall_flag,      // Neelu: To indicate all ROB  stalls.
-        load_stall_flag, // Neelu: Adding to indicate a load stall and that stall begin cycle has been updated already
-        retire_window_fellow_is_trouble,
+        // stall_flag,      // Neelu: To indicate all ROB  stalls.
+        // load_stall_flag, // Neelu: Adding to indicate a load stall and that stall begin cycle has been updated already
+        // retire_window_fellow_is_trouble,
         btb_miss = 0;
 
     uint8_t branch_type;
     uint64_t branch_target;
 
-    uint32_t fetched, scheduled;
+    uint8_t fetched, scheduled;
+    uint8_t line_fetched[2], line_translated[2], num_fetch_lines;     // used for instr packet (ifetch buffer entries) to mark fetch status if instruction spans across two cache lines
     int num_reg_ops, num_mem_ops, num_reg_dependent;
 
     // executed bit is set after all dependencies are eliminated and this instr is chosen on a cycle, according to EXEC_WIDTH
@@ -234,27 +236,28 @@ public:
     {
         instr_id = 0;
         ip = 0;
-        fetch_producer = 0;
+        // fetch_producer = 0;
         producer_id = 0;
-        translated_cycle = 0;
-        fetched_cycle = 0;
-        execute_begin_cycle = 0;
-        retired_cycle = 0;
+        // translated_cycle = 0;
+        // fetched_cycle = 0;
+        // execute_begin_cycle = 0;
+        // retired_cycle = 0;
         event_cycle = 0;
-        stall_begin_cycle = 0;
-        load_stall_begin_cycle = 0;
-        stall_begin_rob_occupancy = 0;
-        load_stall_flag = 0;
-        stall_flag = 0;
-        retire_window_fellow_is_trouble = 0;
+        // stall_begin_cycle = 0;
+        // load_stall_begin_cycle = 0;
+        // stall_begin_rob_occupancy = 0;
+        // load_stall_flag = 0;
+        // stall_flag = 0;
+        // retire_window_fellow_is_trouble = 0;
 
         is_branch = 0;
         is_memory = 0;
         branch_taken = 0;
+        instr_size = 0;
         branch_mispredicted = 0;
-        branch_prediction_made = 0;
+        // branch_prediction_made = 0;
         translated = 0;
-        data_translated = 0;
+        // data_translated = 0;
         is_producer = 0;
         is_consumer = 0;
         reg_RAW_producer = 0;
@@ -262,7 +265,7 @@ public:
         scheduled = 0;
         executed = 0;
         reg_ready = 0;
-        mem_ready = 0;
+        // mem_ready = 0;
         asid[0] = UINT8_MAX;
         asid[1] = UINT8_MAX;
 
@@ -277,6 +280,12 @@ public:
         num_reg_ops = 0;
         num_mem_ops = 0;
         num_reg_dependent = 0;
+
+        line_fetched[0] = 0;
+        line_fetched[1] = 0;
+        line_translated[0] = 0;
+        line_translated[1] = 0;
+        num_fetch_lines = 0;
 
         for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++)
         {
@@ -327,6 +336,8 @@ public:
             << ", is_branch: " << (int)is_branch << endl;
 
         cout << "branch_taken: " << (int)branch_taken << endl;
+
+        cout << "instr_size: " << (int)instr_size << endl;
 
         cout << "Destination Registers: ";
         for (int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)

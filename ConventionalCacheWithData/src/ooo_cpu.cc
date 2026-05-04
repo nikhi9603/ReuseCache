@@ -307,6 +307,7 @@ void O3_CPU::read_from_trace()
                 arch_instr.ip = current_instr.ip;
                 arch_instr.is_branch = current_instr.is_branch;
                 arch_instr.branch_taken = current_instr.branch_taken;
+                arch_instr.instr_size = current_instr.instr_size;
 
                 arch_instr.asid[0] = cpu;
                 arch_instr.asid[1] = cpu;
@@ -690,6 +691,20 @@ uint32_t O3_CPU::add_to_ifetch_buffer(ooo_model_instr *arch_instr)
     IFETCH_BUFFER.entry[index].translated = 0;
     IFETCH_BUFFER.entry[index].fetched = 0;
 
+    uint64_t start_line = IFETCH_BUFFER.entry[index].ip >> 6;
+    uint64_t end_line = (IFETCH_BUFFER.entry[index].ip + IFETCH_BUFFER.entry[index].instr_size - 1) >> 6;
+
+    if(IFETCH_BUFFER.entry[index].num_fetch_lines == 0)    
+    {
+        bool spans_two_lines = (start_line != end_line);
+        IFETCH_BUFFER.entry[index].num_fetch_lines = (spans_two_lines) ? 2 : 1;
+    }
+
+    IFETCH_BUFFER.entry[index].line_fetched[0] = 0;
+    IFETCH_BUFFER.entry[index].line_fetched[1] = 0;
+    IFETCH_BUFFER.entry[index].line_translated[0] = 0;
+    IFETCH_BUFFER.entry[index].line_translated[1] = 0;
+
     IFETCH_BUFFER.occupancy++;
     IFETCH_BUFFER.tail++;
 
@@ -804,47 +819,93 @@ void O3_CPU::fetch_instruction()
             break;
         }
 
+        uint64_t ip = IFETCH_BUFFER.entry[index].ip;
+        uint8_t size = IFETCH_BUFFER.entry[index].instr_size;
+
+        uint64_t line1_addr = ip >> 6;
+        uint64_t line2_addr = (ip + size - 1) >> 6; // we will use only if fetch lines are 2
+
+        uint64_t line1_full_addr = ip;
+        uint64_t line2_full_addr = (line2_addr) << 6;
+
+        uint8_t line1_size, line2_size;
+        if(IFETCH_BUFFER.entry[index].num_fetch_lines == 2)
+        {
+            line1_size = (line2_addr << 6) - ip;
+            line2_size = size - line1_size;
+        }
+        else
+        {
+            line1_size = size;
+            line2_size = 0;
+        }
+
         if ((IFETCH_BUFFER.entry[index].fetched == 0))
         {
-            // add it to the L1-I's read queue
-            PACKET fetch_packet;
-            fetch_packet.instruction = 1;
-            fetch_packet.is_data = 0;
-            fetch_packet.fill_level = FILL_L1;
-            fetch_packet.fill_l1i = 1;
-            fetch_packet.cpu = cpu;
-            fetch_packet.address = IFETCH_BUFFER.entry[index].ip >> 6;
-            fetch_packet.full_addr = IFETCH_BUFFER.entry[index].ip;
-            fetch_packet.full_virtual_address = IFETCH_BUFFER.entry[index].ip;
-            // cout << "FETCH:: instr_id:"<< hex << IFETCH_BUFFER.entry[index].instr_id << ", ip =" << IFETCH_BUFFER.entry[index].ip << ", full_virtual_address: " << hex << fetch_packet.full_virtual_address << endl;
-            // fetch_packet.data_value = nullptr;
-            fetch_packet.data_size = 0;
-            fetch_packet.block_offset = 0;
-            fetch_packet.instr_id = 0;
-            // Neelu: Is assigning rob_index = 0 going to cause any problems?
-            fetch_packet.rob_index = 0;
-            fetch_packet.producer = 0;
-            fetch_packet.ip = IFETCH_BUFFER.entry[index].ip;
-            fetch_packet.type = LOAD;
-            fetch_packet.asid[0] = 0;
-            fetch_packet.asid[1] = 0;
-            fetch_packet.event_cycle = current_core_cycle[cpu];
-
-            // cout << "--FETCH STAGE--" << endl;
-            // cout << "IP without offset = " << fetch_packet.fi
-            int rq_index = L1I.add_rq(&fetch_packet);
-            // cout << "L1 add rq: return val = " << dec << rq_index << endl;
-            if (rq_index != -2)
+            for(int n = 0; n < IFETCH_BUFFER.entry[index].num_fetch_lines; n++)
             {
-                // mark all instructions from this cache line as having been fetched
-                for (uint32_t j = 0; j < IFETCH_BUFFER.SIZE; j++)
+                if(IFETCH_BUFFER.entry[index].line_fetched[n] == 0)
                 {
-                    if (((IFETCH_BUFFER.entry[j].ip) >> 6) == ((IFETCH_BUFFER.entry[index].ip) >> 6))
+                    // add it to the L1-I's read queue
+                    PACKET fetch_packet;
+                    fetch_packet.instruction = 1;
+                    fetch_packet.is_data = 0;
+                    fetch_packet.fill_level = FILL_L1;
+                    fetch_packet.fill_l1i = 1;
+                    fetch_packet.cpu = cpu;
+
+                    uint64_t fetch_line = (n == 0) ? line1_addr : line2_addr;
+
+                    fetch_packet.address = fetch_line;
+                    fetch_packet.full_addr = (n == 0) ? line1_full_addr: line2_full_addr;
+                    fetch_packet.full_virtual_address = (n == 0) ? line1_full_addr: line2_full_addr;
+                    // cout << "FETCH:: instr_id:"<< hex << IFETCH_BUFFER.entry[index].instr_id << ", ip =" << IFETCH_BUFFER.entry[index].ip << ", full_virtual_address: " << hex << fetch_packet.full_virtual_address << endl;
+                    // fetch_packet.data_value = nullptr;
+                    fetch_packet.data_size = (n == 0) ? line1_size : line2_size;
+                    fetch_packet.block_offset = (n == 0) ? (ip & BLOCK_OFFSET_MASK) : 0;
+                    fetch_packet.instr_id = 0;
+                    // Neelu: Is assigning rob_index = 0 going to cause any problems?
+                    fetch_packet.rob_index = 0;
+                    fetch_packet.producer = 0;
+                    fetch_packet.ip = ip;
+                    fetch_packet.type = LOAD;
+                    fetch_packet.asid[0] = 0;
+                    fetch_packet.asid[1] = 0;
+                    fetch_packet.event_cycle = current_core_cycle[cpu];
+
+                    // cout << "--FETCH STAGE--" << endl;
+                    // cout << "IP without offset = " << fetch_packet.fi
+                    int rq_index = L1I.add_rq(&fetch_packet);
+                    // cout << "L1 add rq: return val = " << dec << rq_index << endl;
+                    if (rq_index != -2)
                     {
-                        IFETCH_BUFFER.entry[j].translated = COMPLETED;
-                        IFETCH_BUFFER.entry[j].fetched = INFLIGHT;
+                        IFETCH_BUFFER.entry[index].line_fetched[n] = INFLIGHT;
+                        IFETCH_BUFFER.entry[index].line_translated[n] = COMPLETED;
+
+                        // mark all instructions from this cache line as having been fetched (line fetched)
+                        for (uint32_t j = 0; j < IFETCH_BUFFER.SIZE; j++)
+                        {
+                            for(int k = 0; k < IFETCH_BUFFER.entry[j].num_fetch_lines; k++)
+                            {
+                                uint64_t other_fetch_addr = (k == 0) ? IFETCH_BUFFER.entry[j].ip >> 6 : (IFETCH_BUFFER.entry[j].ip + IFETCH_BUFFER.entry[j].instr_size - 1) >> 6;
+
+                                if (other_fetch_addr == fetch_line)
+                                {
+                                    IFETCH_BUFFER.entry[j].line_fetched[k] = INFLIGHT;
+                                    IFETCH_BUFFER.entry[j].line_translated[k] = COMPLETED;
+                                }
+                            }
+                        }
                     }
                 }
+            }
+
+            bool isInflight = (IFETCH_BUFFER.entry[index].line_fetched[0] == INFLIGHT) && ((IFETCH_BUFFER.entry[index].num_fetch_lines == 1) || IFETCH_BUFFER.entry[index].line_fetched[1] == INFLIGHT);
+            if(isInflight) 
+            {
+                IFETCH_BUFFER.entry[index].fetched = INFLIGHT;
+                IFETCH_BUFFER.entry[index].translated = COMPLETED;  // decode wont happen till fetched = completed too, so no issues? vipt - parallel tlb?
+                // cout << "instr fetch inflight for id = " << IFETCH_BUFFER.entry[index].instr_id << endl;
             }
         }
 
@@ -1879,32 +1940,33 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
                 break; // should be break
             }
 
-            if ((LQ.entry[lq_index].producer_id == UINT64_MAX) && (LQ.entry[lq_index].instr_id <= SQ.entry[i].instr_id))
-            { // WAR
-                // a load is about to be added in the load queue and we found a store that is
-                // "logically later in the program order but already executed" => this is not correctly executed WAR
-                // due to out-of-order execution, this case is possible, for example
-                // 1) application is load intensive and load queue is full
-                // 2) we have loads that can't be added in the load queue
-                // 3) subsequent stores logically behind in the program order are added in the store queue first
+            // TODO:: I dont think this is required for current way of implementation 
+            // if ((LQ.entry[lq_index].producer_id == UINT64_MAX) && (LQ.entry[lq_index].instr_id <= SQ.entry[i].instr_id))
+            // { // WAR
+            //     // a load is about to be added in the load queue and we found a store that is
+            //     // "logically later in the program order but already executed" => this is not correctly executed WAR
+            //     // due to out-of-order execution, this case is possible, for example
+            //     // 1) application is load intensive and load queue is full
+            //     // 2) we have loads that can't be added in the load queue
+            //     // 3) subsequent stores logically behind in the program order are added in the store queue first
 
 
-                // thanks to the store buffer, data is not written back to the memory system until retirement
-                // also due to in-order retirement, this "already executed store" cannot be retired until we finish the prior load instruction
-                // if we detect WAR when a load is added in the load queue, just let the load instruction to access the memory system
-                // no need to mark any dependency because this is actually WAR not RAW
+            //     // thanks to the store buffer, data is not written back to the memory system until retirement
+            //     // also due to in-order retirement, this "already executed store" cannot be retired until we finish the prior load instruction
+            //     // if we detect WAR when a load is added in the load queue, just let the load instruction to access the memory system
+            //     // no need to mark any dependency because this is actually WAR not RAW
 
-                // do not forward data from the store queue since this is WAR
-                // just read correct data from data cache
+            //     // do not forward data from the store queue since this is WAR
+            //     // just read correct data from data cache
 
-                LQ.entry[lq_index].physical_address = 0;
-                LQ.entry[lq_index].translated = 0;
-                LQ.entry[lq_index].fetched = 0;
+            //     LQ.entry[lq_index].physical_address = 0;
+            //     LQ.entry[lq_index].translated = 0;
+            //     LQ.entry[lq_index].fetched = 0;
 
-                // DP(if(warmup_complete[cpu]) {
-                // cout << "[LQ] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " reset fetched: " << +LQ.entry[lq_index].fetched;
-                // cout << " to obey WAR store instr_id: " << SQ.entry[i].instr_id << " cycle: " << current_core_cycle[cpu] << endl;
-            }
+            //     // DP(if(warmup_complete[cpu]) {
+            //     // cout << "[LQ] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " reset fetched: " << +LQ.entry[lq_index].fetched;
+            //     // cout << " to obey WAR store instr_id: " << SQ.entry[i].instr_id << " cycle: " << current_core_cycle[cpu] << endl;
+            // }
         }
     }
 
@@ -1951,8 +2013,8 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
 
             if(warmup_complete[cpu])
             {
-            cout << "lq-sq forwarding: lq-index = " << lq_index << ", sq index = " << forwarding_index << endl;
-            cout << "search value: after removed = " << (int)search << endl;
+            // cout << "lq-sq forwarding: lq-index = " << lq_index << ", sq index = " << forwarding_index << endl;
+            // cout << "search value: after removed = " << (int)search << endl;
             }
             release_load_queue(lq_index);
         }
@@ -1986,8 +2048,8 @@ offsets_accessed_by_ip[cpu][ROB.entry[rob_index].ip][accessed_offset] = 1;*/
         }while(i != itr_start);
 
         if (warmup_complete[cpu]) {
-        cout << "[RTL0] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " rob_index: " << LQ.entry[lq_index].rob_index << " is added to RTL0";
-        cout << " head: " << RTL0_head << " tail: " << RTL0_tail << endl;
+        // cout << "[RTL0] " << __func__ << hex << " instr_id: " << LQ.entry[lq_index].instr_id << " rob_index: " << LQ.entry[lq_index].rob_index << " is added to RTL0";
+        // cout << " head: " << RTL0_head << " tail: " << RTL0_tail << endl;
         }
     }
 
@@ -2058,12 +2120,12 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
             else if(load_fullOverlap)
             {
                 full_overlap_sq_data_index = sq_data_index;     // for each rob instr stores, it will be one only ?
-                if(warmup_complete[cpu])
-                {
-                    cout << "full-overlappp: " << sq_data_index << ", rob_index: " << prior << ", dst idx: " << i << ", un_idx: " << j << endl;
-                    cout << "load addr = " << load_addr << ", size: " << load_size << endl;
-                    cout << "store addr = " << store_addr << ", size: " << store_size << endl;
-                }
+                // if(warmup_complete[cpu])
+                // {
+                    // cout << "full-overlappp: " << sq_data_index << ", rob_index: " << prior << ", dst idx: " << i << ", un_idx: " << j << endl;
+                    // cout << "load addr = " << load_addr << ", size: " << load_size << endl;
+                    // cout << "store addr = " << store_addr << ", size: " << store_size << endl;
+                // }
             }
             else
             {
@@ -2097,11 +2159,11 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
         ROB.entry[prior].is_producer = 1;
         LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
         LQ.entry[lq_index].translated = INFLIGHT;
-        if(warmup_complete[cpu])
-        {cout << "full overlap" << endl;
-        cout << "lq-index: " << lq_index << ", sq-dat-index =" << full_overlap_sq_data_index << endl;
-        cout << "load addr = " << load_addr << ", size: " << load_size << endl;
-        }
+        // if(warmup_complete[cpu])
+        // {cout << "full overlap" << endl;
+        // cout << "lq-index: " << lq_index << ", sq-dat-index =" << full_overlap_sq_data_index << endl;
+        // cout << "load addr = " << load_addr << ", size: " << load_size << endl;
+        // }
     }
     else if(last_partial_sq_data_index < UINT32_MAX)
     {
@@ -2109,13 +2171,13 @@ void O3_CPU::mem_RAW_dependency(uint32_t prior, uint32_t current, uint32_t data_
         ROB.entry[prior].is_producer = 1;
         LQ.entry[lq_index].producer_id = ROB.entry[prior].instr_id;
         LQ.entry[lq_index].translated = INFLIGHT;
-        if(warmup_complete[cpu])
-        {
-        cout << "partial overlap" << endl;
+        // if(warmup_complete[cpu])
+        // {
+        // cout << "partial overlap" << endl;
 
-        cout << "lq-index: " << lq_index << ", sq-dat-index =" << last_partial_sq_data_index << endl;
-        cout << "load addr = " << load_addr << ", size: " << load_size << endl;
-        }
+        // cout << "lq-index: " << lq_index << ", sq-dat-index =" << last_partial_sq_data_index << endl;
+        // cout << "load addr = " << load_addr << ", size: " << load_size << endl;
+        // }
     }
     return;
 }
@@ -2489,7 +2551,7 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
             uint64_t load_addr = LQ.entry[lq_index].virtual_address;
             uint32_t load_size = LQ.entry[lq_index].data_size;
 
-            if(warmup_complete[cpu])    cout << "Execute store: sq-index = " << dec << sq_data_index << ", lq-index = " << lq_index << ", sq-rob-index = " << rob_index << endl;
+            // if(warmup_complete[cpu])    cout << "Execute store: sq-index = " << dec << sq_data_index << ", lq-index = " << lq_index << ", sq-rob-index = " << rob_index << endl;
 
     #ifdef SANITY_CHECK
                             if (lq_index >= LQ.SIZE)
@@ -2501,11 +2563,11 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
                                 assert(0);
                             }
 
-                            if(warmup_complete[cpu])
-                            {cout << "lq-producer:id = " << LQ.entry[lq_index].producer_id << ", sq-instr-id:" << SQ.entry[sq_index].instr_id;
-                            cout << "load address: " << load_addr << ", size = " << load_size << endl;
-                            cout << "store-addr: " << store_addr << ", size = " << store_size << endl;
-                            }
+                            // if(warmup_complete[cpu])
+                            // {cout << "lq-producer:id = " << LQ.entry[lq_index].producer_id << ", sq-instr-id:" << SQ.entry[sq_index].instr_id;
+                            // cout << "load address: " << load_addr << ", size = " << load_size << endl;
+                            // cout << "store-addr: " << store_addr << ", size = " << store_size << endl;
+                            // }
                             // full overlap: store completely covers all load bytes
                             bool full_overlap = (store_addr <= load_addr) &&
                                                 (store_addr + store_size >= load_addr + load_size);
@@ -2564,6 +2626,8 @@ int O3_CPU::execute_load(uint32_t rob_index, uint32_t lq_index, uint32_t data_in
     data_packet.cpu = cpu;
     data_packet.data_index = LQ.entry[lq_index].data_index;
     data_packet.lq_index = lq_index;
+    data_packet.is_data = 1;
+    data_packet.instruction = 0;
 
     //@Vishal: VIPT send virtual address instead of physical address
     // data_packet.address = LQ.entry[lq_index].physical_address >> LOG2_BLOCK_SIZE;
@@ -2801,18 +2865,35 @@ void O3_CPU::complete_instr_fetch(PACKET_QUEUE *queue, uint8_t is_it_tlb)
              rob_index = queue->entry[index].rob_index,
              num_fetched = 0;
 
-    uint64_t complete_ip = queue->entry[index].ip;
-    // cout << "COMPLETE_INSTR_FETCH: " << "ip = " << hex << complete_ip << ", rob_index = " << rob_index << ", instr_id: " << queue->entry[index].instr_id << endl;
+    // uint64_t complete_ip = queue->entry[index].ip;
+    uint64_t fetch_line = queue->entry[index].address;
+
+    // cout << "COMPLETE_INSTR_FETCH: " << "ip = " << hex << queue->entry[index].ip << ", rob_index = " << rob_index << ", instr_id: " << queue->entry[index].instr_id << endl;
+    // cout << "fetch line = " << fetch_line << endl;
     // cout << "Va = " << hex<< queue->entry[index].address << ", full_addr = " << queue->entry[index].full_addr << ". full_phy_addr = " << queue->entry[index].full_physical_address << ", full_va = " << queue->entry[index].full_virtual_address << endl; 
 
     // Neelu: Marking IFETCH_BUFFER entries translated and fetched and then returning.
 
     for (uint32_t j = 0; j < IFETCH_BUFFER.SIZE; j++)
     {
-        if (((IFETCH_BUFFER.entry[j].ip) >> 6) == ((complete_ip) >> 6))
+        for(int k = 0; k < IFETCH_BUFFER.entry[j].num_fetch_lines; k++)
         {
-            IFETCH_BUFFER.entry[j].translated = COMPLETED;
+            uint64_t other_fetch_addr = (k == 0) ? IFETCH_BUFFER.entry[j].ip >> 6 : (IFETCH_BUFFER.entry[j].ip + IFETCH_BUFFER.entry[j].instr_size - 1) >> 6;
+            // cout << "other fetch addr: k = : " << k << ", " << other_fetch_addr << endl;
+
+            if (other_fetch_addr == queue->entry[index].full_virtual_address >> 6)
+            {
+                IFETCH_BUFFER.entry[j].line_fetched[k] = COMPLETED;
+                IFETCH_BUFFER.entry[j].line_translated[k] = COMPLETED;
+            }
+        }
+
+        bool isFetch_Complete = (IFETCH_BUFFER.entry[j].line_fetched[0] == COMPLETED) && ((IFETCH_BUFFER.entry[j].num_fetch_lines == 1) || (IFETCH_BUFFER.entry[j].line_fetched[1] == COMPLETED));
+        if(isFetch_Complete)
+        {
             IFETCH_BUFFER.entry[j].fetched = COMPLETED;
+            IFETCH_BUFFER.entry[j].translated = COMPLETED;  
+            // cout << "instr fetch complete for id = " << IFETCH_BUFFER.entry[j].instr_id << endl;
         }
     }
 
@@ -3256,6 +3337,8 @@ void O3_CPU::retire_rob()
                             data_packet.cpu = cpu;
                             data_packet.data_index = SQ.entry[sq_index].data_index;
                             data_packet.sq_index = sq_index;
+                            data_packet.is_data = 1;
+                            data_packet.instruction = 0;
 
                             //@Vishal: VIPT, send virtual address
                             // data_packet.address = SQ.entry[sq_index].physical_address >> LOG2_BLOCK_SIZE;
@@ -3290,8 +3373,8 @@ void O3_CPU::retire_rob()
                                 if (LQ.entry[lq_idx].virtual_address == 0)
                                     continue; // already released // todo:: is it possible?
                                 
-                                LQ.entry[lq_idx].event_cycle = current_core_cycle[cpu];
-
+                                LQ.entry[lq_idx].event_cycle = current_core_cycle[cpu]+1;
+                                sim_partial_RAW_hits++;
                                 // push to RTL0 non-FIFO
                                 uint32_t itr_start = RTL0_tail;
                                 uint32_t k = itr_start;

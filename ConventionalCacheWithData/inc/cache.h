@@ -184,6 +184,8 @@ public:
         roi_instr_miss[NUM_CPUS][NUM_TYPES];
 
     uint64_t total_miss_latency;
+    uint64_t wrong_partial_overlap_wq_to_rq_forwarding;
+    uint64_t waw_count;
 
     // constructor
     CACHE(string v1, uint32_t v2, int v3, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7, uint32_t v8)
@@ -282,7 +284,8 @@ public:
                 pref_late[i][j] = 0;
             }
         }
-
+        wrong_partial_overlap_wq_to_rq_forwarding = 0;
+        waw_count = 0;
         // Addition by Neelu end
 
         initialize_replacement = &CACHE::base_initialize_replacement;

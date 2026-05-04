@@ -98,12 +98,12 @@ public:
         translated,
         fetched,
         prefetched,
-        drc_tag_read,
+        // drc_tag_read,
         critical_ip_flag; // Neelu: Adding to indicate that current packet's ip has been identified as critical.
 
     int fill_level,
         pf_origin_level,
-        rob_signal,
+        // rob_signal,
         rob_index,
         producer,
         delta,
@@ -176,7 +176,7 @@ public:
         translated = 0;
         fetched = 0;
         prefetched = 0;
-        drc_tag_read = 0;
+        // drc_tag_read = 0;
         send_both_tlb = 0;
         send_both_cache = 0;
         late_pref = 0;
@@ -190,7 +190,7 @@ public:
 
         fill_level = -1;
         pf_origin_level = -1;
-        rob_signal = -1;
+        // rob_signal = -1;
         rob_index = -1;
         producer = -1;
         delta = 0;
@@ -366,16 +366,16 @@ public:
         head,
         tail,
         occupancy,
-        last_read, last_fetch, last_scheduled,
-        inorder_fetch[2],
-        next_fetch[2],
+        // last_read, last_fetch, last_scheduled,
+        // inorder_fetch[2],
+        // next_fetch[2],
         next_schedule;
-    uint64_t event_cycle,
-        fetch_event_cycle,
-        schedule_event_cycle,
-        execute_event_cycle,
-        lsq_event_cycle,
-        retire_event_cycle;
+    uint64_t event_cycle;
+        // fetch_event_cycle,
+        // schedule_event_cycle,
+        // execute_event_cycle,
+        // lsq_event_cycle,
+        // retire_event_cycle;
 
     ooo_model_instr *entry;
 
@@ -386,22 +386,22 @@ public:
         tail = 0;
         occupancy = 0;
 
-        last_read = SIZE - 1;
-        last_fetch = SIZE - 1;
-        last_scheduled = 0;
+        // last_read = SIZE - 1;
+        // last_fetch = SIZE - 1;
+        // last_scheduled = 0;
 
-        inorder_fetch[0] = 0;
-        inorder_fetch[1] = 0;
-        next_fetch[0] = 0;
-        next_fetch[1] = 0;
+        // inorder_fetch[0] = 0;
+        // inorder_fetch[1] = 0;
+        // next_fetch[0] = 0;
+        // next_fetch[1] = 0;
         next_schedule = 0;
 
         event_cycle = 0;
-        fetch_event_cycle = UINT64_MAX;
-        schedule_event_cycle = UINT64_MAX;
-        execute_event_cycle = UINT64_MAX;
-        lsq_event_cycle = UINT64_MAX;
-        retire_event_cycle = UINT64_MAX;
+        // fetch_event_cycle = UINT64_MAX;
+        // schedule_event_cycle = UINT64_MAX;
+        // execute_event_cycle = UINT64_MAX;
+        // lsq_event_cycle = UINT64_MAX;
+        // retire_event_cycle = UINT64_MAX;
 
         entry = new ooo_model_instr[SIZE];
     };
@@ -432,8 +432,8 @@ public:
         fetched,
         asid[2];
     // forwarding_depend_on_me[ROB_SIZE];
-    fastset
-        forwarding_depend_on_me;
+    // fastset
+    //     forwarding_depend_on_me;
 
     // constructor
     LSQ_ENTRY()
