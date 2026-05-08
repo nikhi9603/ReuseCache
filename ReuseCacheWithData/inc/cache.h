@@ -2,6 +2,7 @@
 #define CACHE_H
 
 #include "memory_class.h"
+#include <map>
 // INICIO AGUS
 extern void notify_prefetch(uint64_t addr, uint64_t tag, uint32_t cpu, uint64_t cycle);
 // FIN AGUS
@@ -39,7 +40,7 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define ITLB_WAY 4
 #define ITLB_RQ_SIZE 16
 #define ITLB_WQ_SIZE 16
-#define ITLB_PQ_SIZE 8
+#define ITLB_PQ_SIZE 0
 #define ITLB_MSHR_SIZE 8
 #define ITLB_LATENCY 1
 
@@ -48,7 +49,7 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define DTLB_WAY 4
 #define DTLB_RQ_SIZE 16
 #define DTLB_WQ_SIZE 16
-#define DTLB_PQ_SIZE 8
+#define DTLB_PQ_SIZE 0
 #define DTLB_MSHR_SIZE 8
 #define DTLB_LATENCY 1
 
@@ -67,45 +68,45 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define STLB_WAY 12
 #define STLB_RQ_SIZE 32
 #define STLB_WQ_SIZE 32
-#define STLB_PQ_SIZE 8
+#define STLB_PQ_SIZE 0
 #define STLB_MSHR_SIZE 16
 #define STLB_LATENCY 8
 
 // L1 INSTRUCTION CACHE
-#define L1I_SET 128
-#define L1I_WAY 4
+#define L1I_SET 64
+#define L1I_WAY 8
 #define L1I_RQ_SIZE 64
 #define L1I_WQ_SIZE 64
-#define L1I_PQ_SIZE 16
+#define L1I_PQ_SIZE 32
 #define L1I_MSHR_SIZE 8
-#define L1I_LATENCY 1
+#define L1I_LATENCY 4
 
 // L1 DATA CACHE
-#define L1D_SET 128
-#define L1D_WAY 4
+#define L1D_SET 64
+#define L1D_WAY 12
 #define L1D_RQ_SIZE 64
 #define L1D_WQ_SIZE 64
-#define L1D_PQ_SIZE 16 //	Neelu: Changed from 8 to 16.
+#define L1D_PQ_SIZE 8 //	Neelu: Changed from 8 to 16.
 #define L1D_MSHR_SIZE 16
-#define L1D_LATENCY 1
+#define L1D_LATENCY 5
 
 // L2 CACHE
-#define L2C_SET 512
+#define L2C_SET 1024
 #define L2C_WAY 8
 #define L2C_RQ_SIZE 32
 #define L2C_WQ_SIZE 32
 #define L2C_PQ_SIZE 16 // Neelu: changing from 16 to 32
 #define L2C_MSHR_SIZE 32
-#define L2C_LATENCY 7 // 5 (L1I or L1D) + 10 = 15 cycles
+#define L2C_LATENCY 10 // 5 (L1I or L1D) + 10 = 15 cycles
 
 // LAST LEVEL CACHE
-#define LLC_SET NUM_CPUS * 8192
+#define LLC_SET NUM_CPUS * 4096
 #define LLC_WAY 16
 #define LLC_RQ_SIZE NUM_CPUS *L2C_MSHR_SIZE // 48
 #define LLC_WQ_SIZE NUM_CPUS *L2C_MSHR_SIZE // 48
 #define LLC_PQ_SIZE NUM_CPUS * 32           // Neelu: Changed from 32 per core to 64
 #define LLC_MSHR_SIZE NUM_CPUS * 64
-#define LLC_LATENCY 10 // 5 (L1I or L1D) + 10 + 20 = 35 cycles
+#define LLC_LATENCY 20 // 5 (L1I or L1D) + 10 + 20 = 35 cycles
 
 class CACHE : public MEMORY
 {
@@ -119,6 +120,7 @@ public:
     uint32_t MAX_READ, MAX_FILL;
     uint32_t reads_available_this_cycle;
     uint8_t cache_type;
+    map<uint64_t, uint64_t> num_uses_before_eviction;
 
     // prefetch stats
     uint64_t pf_requested,
@@ -182,6 +184,8 @@ public:
         roi_instr_miss[NUM_CPUS][NUM_TYPES];
 
     uint64_t total_miss_latency;
+    uint64_t wrong_partial_overlap_wq_to_rq_forwarding;
+    uint64_t waw_count;
 
     // constructor
     CACHE(string v1, uint32_t v2, int v3, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7, uint32_t v8)
@@ -193,16 +197,16 @@ public:
         // cache block
         if (NUM_SET > 0)
         {
-            block = new BLOCK *[NUM_SET];
-            for (uint32_t i = 0; i < NUM_SET; i++)
-            {
-                block[i] = new BLOCK[NUM_WAY];
+        block = new BLOCK *[NUM_SET];
+        for (uint32_t i = 0; i < NUM_SET; i++)
+        {
+            block[i] = new BLOCK[NUM_WAY];
 
-                for (uint32_t j = 0; j < NUM_WAY; j++)
-                {
-                    block[i][j].lru = j;
-                }
+            for (uint32_t j = 0; j < NUM_WAY; j++)
+            {
+                block[i][j].lru = j;
             }
+        }
         }
         else
             block = nullptr;
@@ -285,7 +289,8 @@ public:
                 pref_late[i][j] = 0;
             }
         }
-
+        wrong_partial_overlap_wq_to_rq_forwarding = 0;
+        waw_count = 0;
         // Addition by Neelu end
 
         initialize_replacement = &CACHE::base_initialize_replacement;
@@ -323,17 +328,17 @@ public:
 
     virtual void handle_fill(),
         handle_writeback(),
-        handle_read();
-    void handle_processed();
+        handle_read(),
+        handle_prefetch();
+    void handle_processed();     // no need of virtual
 
-    void handle_prefetch(),
-        flush_TLB();
+    void flush_TLB();   // no need of virtual
 
-    virtual void lru_update(uint32_t set, uint32_t way);
-    void fill_cache(uint32_t set, uint32_t way, PACKET *packet);
+    void lru_update(uint32_t set, uint32_t way);     // no need of virtual, we will use some other function and  not using in reuse cache or anywhere in cache calling this with llc cache so no virtualkept as of now.
+    void fill_cache(uint32_t set, uint32_t way, PACKET *packet);     // not using in reuse cache or anywhere in cache calling this with llc cache so no virtualkept as of now.
 
     virtual uint32_t get_set(uint64_t address);
-    uint32_t get_way(uint64_t address, uint32_t set);
+    uint32_t get_way(uint64_t address, uint32_t set);   // not using in reuse cache or anywhere in cache calling this with llc cache so no virtualkept as of now.
 
     void add_nonfifo_queue(PACKET_QUEUE *queue, PACKET *packet), //@Vishal: Updated from add_mshr
         update_fill_cycle(),

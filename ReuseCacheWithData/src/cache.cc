@@ -411,10 +411,15 @@ void CACHE::handle_fill()
                     writeback_packet.address = block[set][way].address;
                     writeback_packet.full_addr = block[set][way].full_addr;
                     writeback_packet.data = block[set][way].data;
-                    writeback_packet.instr_id = MSHR.entry[mshr_index].instr_id;
+                    writeback_packet.instr_id = 0;
+                    // cout << __func__ << "mshr instrd id = " << MSHR.entry[mshr_index].instr_id << endl;
                     writeback_packet.ip = 0; // writeback does not have ip
                     writeback_packet.type = WRITEBACK;
                     writeback_packet.event_cycle = current_core_cycle[fill_cpu];
+                    // writeback_packet.data_value = block[set][way].data_value;
+                    memcpy(writeback_packet.data_value, block[set][way].data_value, BLOCK_SIZE);
+                    writeback_packet.data_size = BLOCK_SIZE;
+                    writeback_packet.block_offset = 0;
 
                     lower_level->add_wq(&writeback_packet);
                 }
@@ -491,13 +496,13 @@ void CACHE::handle_fill()
             if (cache_type == IS_L2C)
                 MSHR.entry[mshr_index].pf_metadata = l2c_prefetcher_cache_fill(MSHR.entry[mshr_index].address << LOG2_BLOCK_SIZE, set, way, (MSHR.entry[mshr_index].type == PREFETCH) ? 1 : 0,
                                                                                block[set][way].address << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].pf_metadata);
-            if (cache_type == IS_LLC)
-            {
-                cpu = fill_cpu;
-                MSHR.entry[mshr_index].pf_metadata = llc_prefetcher_cache_fill(MSHR.entry[mshr_index].address << LOG2_BLOCK_SIZE, set, way, (MSHR.entry[mshr_index].type == PREFETCH) ? 1 : 0,
-                                                                               block[set][way].address << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].pf_metadata);
-                cpu = 0;
-            }
+            // if (cache_type == IS_LLC)
+            // {
+            //     cpu = fill_cpu;
+            //     MSHR.entry[mshr_index].pf_metadata = llc_prefetcher_cache_fill(MSHR.entry[mshr_index].address << LOG2_BLOCK_SIZE, set, way, (MSHR.entry[mshr_index].type == PREFETCH) ? 1 : 0,
+            //                                                                    block[set][way].address << LOG2_BLOCK_SIZE, MSHR.entry[mshr_index].pf_metadata);
+            //     cpu = 0;
+            // }
 
 #ifdef NOTIFY_L1D_OF_DTLB_EVICTION
             // Neelu: Sending DTLB eviction notice to L1D
@@ -810,6 +815,12 @@ void CACHE::handle_writeback()
 
             // mark dirty
             block[set][way].dirty = 1;
+            block[set][way].used = 1;
+            block[set][way].num_uses++;
+            // block[set][way].data_value = WQ.entry[index].data_value;
+            block[set][way].data = WQ.entry[index].data;
+            memcpy(block[set][way].data_value+WQ.entry[index].block_offset, WQ.entry[index].data_value, WQ.entry[index].data_size);
+            
 
             if (cache_type == IS_ITLB)
                 WQ.entry[index].instruction_pa = block[set][way].data;
@@ -877,7 +888,8 @@ void CACHE::handle_writeback()
                     //@Vishal: Send physical address to lower level and track physical address in MSHR
                     new_packet.address = WQ.entry[index].full_physical_address >> LOG2_BLOCK_SIZE;
                     new_packet.full_addr = WQ.entry[index].full_physical_address;
-
+                    // cout << "adding new pkt to L1D lower level: new pkt's full_addr: " << hex << new_packet.full_addr << ", addr: " << new_packet.address << endl;
+                    // cout << "handle writeback: wq entry: addr:" << hex << WQ.entry[index].address << ", full_addr:" << WQ.entry[index].full_addr << endl;
                     // add it to mshr (RFO miss)
                     add_nonfifo_queue(&MSHR, &new_packet); //@Vishal: Updated from add_mshr
 
@@ -1006,10 +1018,15 @@ void CACHE::handle_writeback()
                             writeback_packet.address = block[set][way].address;
                             writeback_packet.full_addr = block[set][way].full_addr;
                             writeback_packet.data = block[set][way].data;
-                            writeback_packet.instr_id = WQ.entry[index].instr_id;
+                            writeback_packet.instr_id = 0;
+                            // cout << __func__ << "wq instrd id = " << WQ.entry[index].instr_id << endl;
                             writeback_packet.ip = 0;
                             writeback_packet.type = WRITEBACK;
                             writeback_packet.event_cycle = current_core_cycle[writeback_cpu];
+                            // writeback_packet.data_value = block[set][way].data_value;
+                            memcpy(writeback_packet.data_value, block[set][way].data_value, BLOCK_SIZE);
+                            writeback_packet.data_size = BLOCK_SIZE;
+                            writeback_packet.block_offset = 0;
 
                             lower_level->add_wq(&writeback_packet);
                         }
@@ -1058,13 +1075,13 @@ void CACHE::handle_writeback()
                     else if (cache_type == IS_L2C)
                         WQ.entry[index].pf_metadata = l2c_prefetcher_cache_fill(WQ.entry[index].address << LOG2_BLOCK_SIZE, set, way, 0,
                                                                                 block[set][way].address << LOG2_BLOCK_SIZE, WQ.entry[index].pf_metadata);
-                    if (cache_type == IS_LLC)
-                    {
-                        cpu = writeback_cpu;
-                        WQ.entry[index].pf_metadata = llc_prefetcher_cache_fill(WQ.entry[index].address << LOG2_BLOCK_SIZE, set, way, 0,
-                                                                                block[set][way].address << LOG2_BLOCK_SIZE, WQ.entry[index].pf_metadata);
-                        cpu = 0;
-                    }
+                    // if (cache_type == IS_LLC)
+                    // {
+                    //     cpu = writeback_cpu;
+                    //     WQ.entry[index].pf_metadata = llc_prefetcher_cache_fill(WQ.entry[index].address << LOG2_BLOCK_SIZE, set, way, 0,
+                    //                                                             block[set][way].address << LOG2_BLOCK_SIZE, WQ.entry[index].pf_metadata);
+                    //     cpu = 0;
+                    // }
 
 #ifdef NOTIFY_L1D_OF_DTLB_EVICTION
                     // Neelu: Sending DTLB eviction notice to L1D
@@ -1148,11 +1165,16 @@ void CACHE::handle_processed()
                     });
 
                     RQ.entry[rq_index].translated = COMPLETED;
+                    // cout << "translation completed 1" << rq_index << endl;
 
                     if (tlb.cache_type == IS_ITLB)
+                    {    
                         RQ.entry[rq_index].full_physical_address = (tlb.PROCESSED.entry[index].instruction_pa << LOG2_PAGE_SIZE) | (RQ.entry[rq_index].full_addr & ((1 << LOG2_PAGE_SIZE) - 1));
+                        // cout << "Handle processed: ITLB RQ: full_phys_addr: " << hex << RQ.entry[rq_index].full_physical_address << ", instr_pa = " << tlb.PROCESSED.entry[index].instruction_pa << ", full_addr = " << RQ.entry[rq_index].full_addr << endl; 
+                    }
                     else
                     {
+                        // cout << "marking lq as translated" << endl;
                         // Neelu: Marking the corresponding LQ entry as translated.
                         ooo_cpu[cpu].LQ.entry[RQ.entry[rq_index].lq_index].translated = COMPLETED;
                         ITERATE_SET(merged, RQ.entry[rq_index].lq_index_depend_on_me, ooo_cpu[cpu].LQ.SIZE)
@@ -1161,6 +1183,7 @@ void CACHE::handle_processed()
                         }
 
                         RQ.entry[rq_index].full_physical_address = (tlb.PROCESSED.entry[index].data_pa << LOG2_PAGE_SIZE) | (RQ.entry[rq_index].full_addr & ((1 << LOG2_PAGE_SIZE) - 1));
+                        // cout << "Handle processed: RQ: full_phys_addr: " << hex << RQ.entry[rq_index].full_physical_address << ", data_pa = " << tlb.PROCESSED.entry[index].data_pa << ", full_addr = " << RQ.entry[rq_index].full_addr << endl; 
                     }
 
                     // ADD LATENCY
@@ -1181,7 +1204,7 @@ void CACHE::handle_processed()
                     WQ.entry[wq_index].translated = COMPLETED;
 
                     if (tlb.cache_type == IS_ITLB)
-                        WQ.entry[wq_index].full_physical_address = (tlb.PROCESSED.entry[index].instruction_pa << LOG2_PAGE_SIZE) | (WQ.entry[wq_index].full_addr & ((1 << LOG2_PAGE_SIZE) - 1));
+                    {    WQ.entry[wq_index].full_physical_address = (tlb.PROCESSED.entry[index].instruction_pa << LOG2_PAGE_SIZE) | (WQ.entry[wq_index].full_addr & ((1 << LOG2_PAGE_SIZE) - 1));}
                     else
                         WQ.entry[wq_index].full_physical_address = (tlb.PROCESSED.entry[index].data_pa << LOG2_PAGE_SIZE) | (WQ.entry[wq_index].full_addr & ((1 << LOG2_PAGE_SIZE) - 1));
 
@@ -1267,9 +1290,9 @@ void CACHE::handle_processed()
                         else
                             RQ.entry[other_rq_index].event_cycle += LATENCY;
 
-                        DP(if (warmup_complete[cpu]) {
-                            cout << "[" << NAME << "_handle_processed] packet: " << RQ.entry[other_rq_index];
-                        });
+                        // DP(if (warmup_complete[cpu]) {
+                            // cout << "[" << NAME << "_handle_processed] packet: " << RQ.entry[other_rq_index];
+                        // });
                     }
                 }
             }
@@ -1425,7 +1448,10 @@ void CACHE::handle_read()
     {
         for (uint32_t rq_index = 0; rq_index < RQ.SIZE; rq_index++)
             if (RQ.entry[rq_index].translated == COMPLETED && (RQ.entry[rq_index].event_cycle <= current_core_cycle[cpu]))
-                reads_ready.insert({RQ.entry[rq_index].event_cycle, rq_index});
+            {
+                    reads_ready.insert({RQ.entry[rq_index].event_cycle, rq_index});
+                    // cout << "reads ready: rq_index = " << rq_index << endl;
+            }
     }
     auto reads_ready_it = reads_ready.begin();
 
@@ -1550,7 +1576,18 @@ void CACHE::handle_read()
 
             if (way >= 0)
             { // read hit
-
+                // if (cache_type > 3 && cache_type < 7)
+                // {
+                //     for (int i = 0; i < RQ.entry[index].data_size; i++)
+                //     {
+                //         if (RQ.entry[index].block_offset + i >= BLOCK_SIZE || (block[set][way].data_valid[RQ.entry[index].block_offset + i] && *(RQ.entry[index].data_value + i) != block[set][way].data_value[RQ.entry[index].block_offset + i]))
+                //         {
+                //             cout << "Data mismatch: " << *(RQ.entry[index].data_value + i) << " " << block[set][way].data_value[RQ.entry[index].block_offset + i] << endl;
+                //             assert(0);
+                //         }
+                //     }
+                // }
+                // cout << "Read hit " << endl;
                 if (cache_type == IS_ITLB)
                 {
 
@@ -1559,6 +1596,7 @@ void CACHE::handle_read()
                     // RQ.entry[index].event_cycle = current_core_cycle[read_cpu];
                     if (PROCESSED.occupancy < PROCESSED.SIZE)
                         PROCESSED.add_queue(&RQ.entry[index]);
+                    // cout << "Read hit ITLB : index = " << index << endl;
                 }
                 else if (cache_type == IS_DTLB)
                 {
@@ -1571,6 +1609,7 @@ void CACHE::handle_read()
 
                     if (PROCESSED.occupancy < PROCESSED.SIZE)
                         PROCESSED.add_queue(&RQ.entry[index]);
+                    // cout << "Read hit DTLB : index = " << index << endl;
                 }
                 else if (cache_type == IS_STLB)
                 {
@@ -1626,7 +1665,7 @@ void CACHE::handle_read()
                     if(ooo_cpu[read_cpu].num_retired > 0)
                     l2c_mpki = (ooo_cpu[read_cpu].L2C.sim_miss[read_cpu][0]*1000)/(ooo_cpu[read_cpu].num_retired);
 
-                    uncore.LLC->llc_prefetcher_operate(phy_addr<<LOG2_BLOCK_SIZE, RQ.entry[index].ip, 0, 6, temp_metadata, l2c_mpki); //ooo_cpu[read_cpu].L2C.l2c_pref_accuracy);
+                    uncore.LLC.llc_prefetcher_operate(phy_addr<<LOG2_BLOCK_SIZE, RQ.entry[index].ip, 0, 6, temp_metadata, l2c_mpki); //ooo_cpu[read_cpu].L2C.l2c_pref_accuracy);
                     //	if((((temp_metadata >> 17) & 1) | ((temp_metadata >> 18) & 1)) == 1)
                     //	{
                     //		getting_hint_from_l2++;
@@ -1777,7 +1816,7 @@ void CACHE::handle_read()
                             upper_level_dcache[read_cpu]->return_data(&RQ.entry[index]);
                         }
 #ifdef SANITY_CHECK
-                        if (RQ.entry[index].data == 0)
+                        if (RQ.entry[index].data == 0)          // data_Value zero check should be added. as of now left data field also as is since tlb caches are using that to get physical address or check with zero are many
                             assert(0);
 #endif
                     }
@@ -1809,11 +1848,15 @@ void CACHE::handle_read()
                         if (RQ.entry[index].instruction)
                         {
                             RQ.entry[index].data = block[set][way].data;
+                            // RQ.entry[index].data_value = block[set][way].data_value;
+                            memcpy(RQ.entry[index].data_value, block[set][way].data_value + RQ.entry[index].block_offset, RQ.entry[index].data_size);
                             upper_level_icache[read_cpu]->return_data(&RQ.entry[index]);
                         }
                         else // data
                         {
                             RQ.entry[index].data = block[set][way].data;
+                            // RQ.entry[index].data_value = block[set][way].data_value;
+                            memcpy(RQ.entry[index].data_value, block[set][way].data_value + RQ.entry[index].block_offset, RQ.entry[index].data_size);
                             upper_level_dcache[read_cpu]->return_data(&RQ.entry[index]);
                         }
 #ifdef SANITY_CHECK
@@ -1835,6 +1878,7 @@ void CACHE::handle_read()
                         pref_useful[cpu][block[set][way].pref_class]++;
                 }
                 block[set][way].used = 1;
+                block[set][way].num_uses++;
 
                 HIT[RQ.entry[index].type]++;
                 ACCESS[RQ.entry[index].type]++;
@@ -1845,7 +1889,7 @@ void CACHE::handle_read()
             }
             else
             { // read miss
-
+                // cout << "Read miss: " << RQ.head << endl;
                 DP(if (warmup_complete[read_cpu]) {
                             cout << "[" << NAME << "] " << __func__ << " read miss";
                             cout << " instr_id: " << RQ.entry[index].instr_id << " address: " << hex << RQ.entry[index].address;
@@ -1865,8 +1909,8 @@ void CACHE::handle_read()
                 if ((mshr_index == -1) && (MSHR.occupancy < MSHR_SIZE))
                 { // this is a new miss
 
-                    if (cache_type == IS_STLB && MSHR.entry[mshr_index].type == TRANSLATION_FROM_L1D)
-                        pf_lower_level++;
+                    // if (cache_type == IS_STLB && MSHR.entry[mshr_index].type == TRANSLATION_FROM_L1D)
+                    //     pf_lower_level++;
 
                     if (cache_type == IS_LLC)
                     {
@@ -1903,6 +1947,8 @@ void CACHE::handle_read()
                             //@Vishal: Send physical address to lower level and track physical address in MSHR
                             new_packet.address = RQ.entry[index].full_physical_address >> LOG2_BLOCK_SIZE;
                             new_packet.full_addr = RQ.entry[index].full_physical_address;
+                            // cout << "adding new pkt in handle read: new pkt's full_addr: " << hex << new_packet.full_addr << ", addr: " << new_packet.address << endl;
+                            // cout << "handle read: rq entry: addr:" << hex << RQ.entry[index].address << ", full_addr:" << RQ.entry[index].full_addr << endl;
 
                             add_nonfifo_queue(&MSHR, &new_packet); //@Vishal: Updated from add_mshr
                             lower_level->add_rq(&new_packet);
@@ -2028,7 +2074,7 @@ void CACHE::handle_read()
                             }
                             else
                             {
-                                // Neelu: Added to processed queue even on miss for ideal L1 prefetcher, comment if not needed.
+                                // Neelu:f Added to processed queue even on miss for ideal L1 prefetcher, comment if not needed.
 #ifdef PRACTICAL_PERFECT_L1D
                                 if ((cache_type == IS_L1D) && (RQ.entry[index].type != PREFETCH))
                                 {
@@ -2224,6 +2270,8 @@ void CACHE::handle_read()
                                 MSHR.entry[mshr_index].address = prior_address;
                                 MSHR.entry[mshr_index].full_addr = prior_full_addr;
                                 MSHR.entry[mshr_index].full_physical_address = prior_full_physical_address;
+
+                                // cout << "Handle read: MSHR entry addresses: addr= " << hex << MSHR.entry[mshr_index].address << " , full_addr= " << MSHR.entry[mshr_index].full_addr << " , full_phy_addR = " << MSHR.entry[mshr_index].full_physical_address << " , full_virt_addr = " << MSHR.entry[mshr_index].full_virtual_address << endl;
                             }
 
                             // in case request is already returned, we should keep event_cycle and retunred variables
@@ -2525,11 +2573,15 @@ void CACHE::handle_prefetch()
                         if (PQ.entry[index].fill_l1i)
                         {
                             PQ.entry[index].data = block[set][way].data;
+                            // PQ.entry[index].data_value = block[set][way].data_value;
+                            memcpy(PQ.entry[index].data_value, block[set][way].data_value, BLOCK_SIZE);
                             upper_level_icache[prefetch_cpu]->return_data(&PQ.entry[index]);
                         }
                         if (PQ.entry[index].fill_l1d)
                         {
                             PQ.entry[index].data = block[set][way].data;
+                            // PQ.entry[index].data_value = block[set][way].data_value;
+                            memcpy(PQ.entry[index].data_value, block[set][way].data_value, BLOCK_SIZE);
                             upper_level_dcache[prefetch_cpu]->return_data(&PQ.entry[index]);
                         }
                     }
@@ -2919,11 +2971,43 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     if (block[set][way].prefetch && (block[set][way].used == 0))
         pf_useless++;
 
+    if(block[set][way].valid)
+        num_uses_before_eviction[block[set][way].num_uses]++;
+
     if (block[set][way].valid == 0)
         block[set][way].valid = 1;
     block[set][way].dirty = 0;
     block[set][way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
     block[set][way].used = 0;
+    block[set][way].num_uses = 0;
+    
+    if(packet->is_data == true && packet->data_size > BLOCK_SIZE)
+    {
+        cout << "Data size is greater than block size " << dec << (int)packet->data_size << endl;
+        assert(0);
+    }
+    if (packet->is_data == true&& packet->block_offset > BLOCK_SIZE)
+    {
+        cout << "Block offset is greater than block size" << endl;
+        assert(0);
+    }
+    if (packet->is_data == true && (packet->data_size + packet->block_offset > BLOCK_SIZE))
+    {
+        cout << "Data extends beyond block boundary. Unaligned access!" << endl;
+        cout << "Packet: ip : " << hex << packet->ip << " , instr_id: " << packet->instr_id << endl;
+        cout << "Address: " << hex << packet->address << ", data size = " << packet->data_size << ", offset = " << packet->block_offset << endl;
+        cout << "Addresses: fulladr: " << hex << packet->full_addr << ", full pa: " << hex << packet->full_physical_address << ", full va: " << packet->full_virtual_address << endl;
+        assert(0);
+    }
+
+
+    if(packet->is_data)
+        memcpy(block[set][way].data_value + packet->block_offset, packet->data_value, packet->data_size);
+    // for (int i = 0; i < packet->data_size; i++)
+    // {
+        // block[set][way].data_valid[i + packet->block_offset] = true;
+    // }
+    
 
     // Neelu: Setting instruction and translation fields in L2C
     if (cache_type == IS_L2C)
@@ -2966,6 +3050,8 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
     block[set][way].data = packet->data;
     block[set][way].cpu = packet->cpu;
     block[set][way].instr_id = packet->instr_id;
+    // cout << __func__ << "pkt instrd id = " << packet->instr_id << "cache_type: "<< dec << (int)cache_type <<  endl;
+
 
     DP(if (warmup_complete[packet->cpu]) {
                     cout << "[" << NAME << "] " << __func__ << " set: " << set << " way: " << way;
@@ -3072,7 +3158,7 @@ void CACHE::flush_TLB()
 }
 
 int CACHE::add_rq(PACKET *packet)
-{
+{  
     // check for the latest wirtebacks in the write queue
     // @Vishal: WQ is non-fifo for L1 cache
 
@@ -3091,6 +3177,8 @@ int CACHE::add_rq(PACKET *packet)
             assert(0);
         }
 
+        if(cache_type != IS_L1D || ((cache_type == IS_L1D) && ((WQ.entry[wq_index].full_virtual_address == packet->full_virtual_address) && WQ.entry[wq_index].data_size == packet->data_size)))
+        {
         // Neelu: 1 cycle WQ forwarding latency added.
         if (packet->event_cycle < current_core_cycle[packet->cpu])
             packet->event_cycle = current_core_cycle[packet->cpu] + 1;
@@ -3102,6 +3190,8 @@ int CACHE::add_rq(PACKET *packet)
         {
 
             packet->data = WQ.entry[wq_index].data;
+            // packet->data_value =  WQ.entry[wq_index].data_value;
+            memcpy(packet->data_value, WQ.entry[wq_index].data_value, packet->data_size);
 
             if (fill_level == FILL_L2)
             {
@@ -3143,7 +3233,7 @@ int CACHE::add_rq(PACKET *packet)
             DP(if (warmup_complete[packet->cpu]) {
                             cout << "[" << NAME << "_RQ] " << __func__ << " instr_id: " << packet->instr_id << " found recent writebacks";
                             cout << hex << " read: " << packet->address << " writeback: " << WQ.entry[wq_index].address << dec;
-                            cout << " index: " << MAX_READ << " rob_signal: " << packet->rob_signal << endl; });
+                            cout << " index: " << MAX_READ << endl; });
         }
 
         HIT[packet->type]++;
@@ -3153,6 +3243,16 @@ int CACHE::add_rq(PACKET *packet)
         RQ.ACCESS++;
 
         return -1;
+    }       
+    else
+    {
+        // wrong_partial_overlap_wq_to_rq_forwarding++;
+            // cout << "partial overlap WAR dependency" << "WQ: index = " << wq_index << ", addr = " << hex << WQ.entry[wq_index].full_virtual_address << dec << ", size = " << (int)WQ.entry[wq_index].data_size << ",instr_id = " << WQ.entry[wq_index].instr_id << endl;
+            // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
+        return -2;
+        /// TODO:: otherwise make else case to return -2 till proper store return status is handled by code and not  just retiring without tracking
+            // only l1d cases
+    }        // As of now avoid
     }
 
     // check for duplicates in the read queue
@@ -3397,10 +3497,11 @@ int CACHE::add_rq(PACKET *packet)
             translation_packet.l1_rq_index = index;
             translation_packet.type = LOAD_TRANSLATION;
 
+            // knob cloudsuite rekated changes are not done
             if (knob_cloudsuite)
                 translation_packet.address = ((packet->ip >> LOG2_PAGE_SIZE) << 9) | (256 + packet->asid[0]);
             else
-                translation_packet.address = packet->ip >> LOG2_PAGE_SIZE;
+                translation_packet.address = packet->full_addr >> LOG2_PAGE_SIZE;       // instr pkt to L1I is divided into two if unaligned access: changed from ip to full_addr field
 
             ooo_cpu[packet->cpu].ITLB.add_rq(&translation_packet);
         }
@@ -3471,7 +3572,13 @@ int CACHE::add_rq(PACKET *packet)
 #endif
 
     if (packet->address == 0)
+    {
+        cout << "[" << NAME << "_RQ] " <<  __func__ << " instr_id: " << RQ.entry[index].instr_id << " address: " << hex << RQ.entry[index].address;
+                    cout << " full_addr: " << RQ.entry[index].full_addr << dec;
+                    cout << " type: " << +RQ.entry[index].type << " head: " << RQ.head << " tail: " << RQ.tail << " occupancy: " << RQ.occupancy;
+                    cout << " event: " << RQ.entry[index].event_cycle << " current: " << current_core_cycle[RQ.entry[index].cpu] << endl; 
         assert(0);
+    }
 
     RQ.TO_CACHE++;
     RQ.ACCESS++;
@@ -3493,8 +3600,8 @@ int CACHE::add_wq(PACKET *packet)
 
     if (index != -1)
     {
-
-        if (WQ.entry[index].cpu != packet->cpu)
+        if((cache_type != IS_L1D) || ((cache_type == IS_L1D) && ((WQ.entry[index].full_virtual_address == packet->full_virtual_address) && (WQ.entry[index].data_size == packet->data_size))))
+        {if (WQ.entry[index].cpu != packet->cpu)
         {
             cout << "Write request from CPU " << packet->cpu << " merging with Write request from CPU " << WQ.entry[index].cpu << endl;
             assert(0);
@@ -3504,6 +3611,14 @@ int CACHE::add_wq(PACKET *packet)
         WQ.ACCESS++;
 
         return index; // merged index
+        }
+        else
+        {
+            // waw_count++;
+            // cout << "WAW dependency" << "WQ: index = " << index << ", addr = " << hex << WQ.entry[index].full_virtual_address << dec << ", size = " << (int)WQ.entry[index].data_size <<  ",instr_id = " << WQ.entry[index].instr_id << endl;
+            // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
+            return -2;
+        }
     }
 
     // sanity check
@@ -3627,7 +3742,7 @@ int CACHE::prefetch_line(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
         pf_packet.address = pf_addr >> LOG2_BLOCK_SIZE;
         pf_packet.full_addr = pf_addr;
         pf_packet.full_virtual_address = pf_addr;
-
+        cout << "PF full addr: " << pf_packet.full_addr << endl;
 #ifdef PUSH_PREFETCHES_FROM_L2_TO_L1
 
         if (cache_type == IS_L1D)
@@ -3800,6 +3915,8 @@ int CACHE::add_pq(PACKET *packet)
         {
 
             packet->data = WQ.entry[wq_index].data;
+            // packet->data_value =  WQ.entry[wq_index].data_value;
+            memcpy(packet->data_value, WQ.entry[wq_index].data_value, BLOCK_SIZE);
 
             if (fill_level == FILL_L2)
             {
@@ -3985,6 +4102,7 @@ int CACHE::add_pq(PACKET *packet)
         // Neelu: Assigning full virtual address to the packet.
         // Todo: Not sure of the implications to cloudsuite.
         translation_packet.full_virtual_address = packet->ip;
+        cout << "ADD PQ: " << translation_packet.full_virtual_address << endl;
 
         ooo_cpu[packet->cpu].ITLB.add_rq(&translation_packet);
     }
@@ -4074,6 +4192,8 @@ void CACHE::return_data(PACKET *packet)
     // no need to do memcpy
     MSHR.num_returned++;
     MSHR.entry[mshr_index].returned = COMPLETED;
+    // MSHR.entry[mshr_index].data_value = packet->data_value;
+    memcpy(MSHR.entry[mshr_index].data_value, packet->data_value, BLOCK_SIZE);
 #ifdef INS_PAGE_TABLE_WALKER
     if (cache_type == IS_STLB)
     {
@@ -4152,7 +4272,7 @@ void CACHE::update_fill_cycle()
     MSHR.next_fill_index = min_index;
     if (min_index < MSHR.SIZE)
     {
-
+        
         DP(if (warmup_complete[MSHR.entry[min_index].cpu]) {
                         cout << "[" << NAME << "_MSHR] " <<  __func__ << " instr_id: " << MSHR.entry[min_index].instr_id;
                         cout << " address: " << hex << MSHR.entry[min_index].address << " full_addr: " << MSHR.entry[min_index].full_addr;

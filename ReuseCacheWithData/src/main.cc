@@ -156,6 +156,7 @@ void print_energy_profile()
 void print_roi_stats(uint32_t cpu, CACHE *cache)
 {
     uint64_t TOTAL_ACCESS = 0, TOTAL_HIT = 0, TOTAL_MISS = 0, TOTAL_INSTR_MISS = 0;
+    uint64_t DEMAND_ACCESS = 0, DEMAND_HIT = 0, DEMAND_MISS = 0;
 
     for (uint32_t i = 0; i < NUM_TYPES; i++)
     {
@@ -165,12 +166,22 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         TOTAL_INSTR_MISS += cache->roi_instr_miss[cpu][i];
     }
 
+    DEMAND_ACCESS = cache->roi_access[cpu][LOAD] + cache->roi_access[cpu][RFO];
+    DEMAND_HIT = cache->roi_hit[cpu][LOAD] + cache->roi_hit[cpu][RFO];
+    DEMAND_MISS = cache->roi_miss[cpu][LOAD] + cache->roi_miss[cpu][RFO];
+
     uint64_t num_instrs = ooo_cpu[cpu].finish_sim_instr;
 
     if (TOTAL_ACCESS != 0)
     {
         cout << cache->NAME;
         cout << " TOTAL     ACCESS: " << setw(10) << TOTAL_ACCESS << "  HIT: " << setw(10) << TOTAL_HIT << "  MISS: " << setw(10) << TOTAL_MISS << "  HIT %: " << setw(10) << ((double)TOTAL_HIT * 100 / TOTAL_ACCESS) << "  MISS %: " << setw(10) << ((double)TOTAL_MISS * 100 / TOTAL_ACCESS) << "   MPKI: " << ((double)TOTAL_MISS * 1000 / num_instrs) << endl;
+    }
+
+    if (DEMAND_ACCESS != 0)
+    {
+        cout << cache->NAME;
+        cout << " DEMAND     ACCESS: " << setw(10) << DEMAND_ACCESS << "  HIT: " << setw(10) << DEMAND_HIT << "  MISS: " << setw(10) << DEMAND_MISS << "  HIT %: " << setw(10) << ((double)DEMAND_HIT * 100 / DEMAND_ACCESS) << "  MISS %: " << setw(10) << ((double)DEMAND_MISS * 100 / DEMAND_ACCESS) << "   MPKI: " << ((double)DEMAND_MISS * 1000 / num_instrs) << endl;
     }
 
     if (cache->cache_type == IS_BTB)
@@ -241,8 +252,8 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         cout << cache->NAME;
         cout << " TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->roi_access[cpu][6] << "  HIT: " << setw(10) << cache->roi_hit[cpu][6] << "  MISS: " << setw(10) << cache->roi_miss[cpu][6] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][6] * 100 / cache->roi_access[cpu][6]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][6] * 100 / cache->roi_access[cpu][6]) << "   MPKI: " << ((double)cache->roi_miss[cpu][6] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
     }
-    // if(cache->pf_requested)
-    //{
+    if(cache->pf_requested)
+    {
     cout << cache->NAME;
     cout << " PREFETCH  REQUESTED: " << setw(10) << cache->pf_requested << "  ISSUED: " << setw(10) << cache->pf_issued;
     cout << "  USEFUL: " << setw(10) << cache->pf_useful << "  USELESS: " << setw(10) << cache->pf_useless << endl;
@@ -253,16 +264,17 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
     cout << cache->NAME << " TIMELY PREFETCHES: " << setw(10) << cache->pf_useful << " LATE PREFETCHES: " << cache->pf_late << " DROPPED PREFETCHES: " << cache->pf_dropped << endl;
     // cout << cache->NAME << " PREFETCHES SAME FILL-ORIGIN LEVEL: " << cache->pf_same_fill_level << " DIFFERENT FILL-ORIGIN LEVEL: " << cache->pf_lower_fill_level << endl;
 
-    //}
     cout << cache->NAME << " PREFETCHES SAME FILL-ORIGIN LEVEL: " << cache->pf_same_fill_level << " DIFFERENT FILL-ORIGIN LEVEL: " << cache->pf_lower_fill_level << endl;
-
+    }
     if (cache->cache_type == IS_PSCL5 || cache->cache_type == IS_PSCL4 || cache->cache_type == IS_PSCL3 || cache->cache_type == IS_PSCL2)
     {
     }
     else
     {
         cout << cache->NAME;
-        cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
+        // cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
+        cout << " AVERAGE MISS LATENCY: (DEMAND MISSES ONLY)" << (1.0 * (cache->total_miss_latency)) / DEMAND_MISS << " cycles" << endl;
+        // As of now total miss latency is being incremented only in case of demand misses
     }
 
     //@Vishal: Will work only for 1 core, for multi-core this will give sim_result not roi_result
@@ -314,8 +326,37 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
     if (cache->cache_type == IS_L2C)
         cout << cache->NAME << " Dense regions hint from L2: " << cache->getting_hint_from_l2 << endl;
     if (cache->cache_type == IS_LLC)
+    {
         cout << cache->NAME << " Dense regions hint to LLC: " << cache->sending_hint_to_llc << endl;
+        // iterate over num_uses_before_eviction map"
+        cout << endl;
 
+        cout << "LLC_EVICTED_BLOCKS_NUM_USES_START" << endl;
+        int evicted_total = 0;
+        for (auto &use : cache->num_uses_before_eviction)
+        {
+            cout << "LLC_EVICTED num_uses: " << use.first << " count: " << use.second << endl;
+            evicted_total += use.second;
+        }
+        cout << "LLC_EVICTED_TOTAL: " << evicted_total << endl;
+        cout << "LLC_EVICTED_BLOCKS_NUM_USES_END" << endl;
+
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_START" << endl;
+        map<uint32_t, uint32_t> resident_uses;
+        for(int i = 0; i < cache->NUM_SET; i++)
+            for(int j = 0; j < cache->NUM_WAY; j++)
+                if(cache->block[i][j].valid == 1)
+                    resident_uses[cache->block[i][j].num_uses]++;
+
+        int resident_total = 0;
+        for (auto &use : resident_uses)
+        {
+            cout << "LLC_RESIDENT num_uses: " << use.first << " count: " << use.second << endl;
+            resident_total += use.second;
+        }
+        cout << "LLC_RESIDENT_TOTAL: " << resident_total << endl;
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_END" << endl;
+    }
     static int flag = 0;
 #ifdef PUSH_DTLB_PB
     if (cache->cache_type == IS_DTLB_PB && flag == 0)
@@ -473,7 +514,269 @@ void reset_cache_stats(uint32_t cpu, CACHE *cache)
     cache->PQ.TO_CACHE = 0;
     cache->PQ.FORWARD = 0;
     cache->PQ.FULL = 0;
+
+    // for(auto &num_uses: cache->num_uses_before_eviction)
+    // {
+    //     num_uses.second = 0;
+    // }
+    cache->num_uses_before_eviction.clear();
+    for(int i = 0; i < cache->NUM_SET; i++)
+    {
+        for(int j = 0; j < cache->NUM_WAY; j++)
+        {
+            if(cache->block[i][j].valid == 1)
+            {
+                cache->block[i][j].num_uses = 0;
+            }
+        }
+    }
 }
+
+// void print_llc_warmup_stats(uint32_t cpu, CACHE *cache)
+// {
+//     if(cpu == 0)
+//     {
+//         cout << "CPU IS 0 ONLY" << endl;
+//         uint64_t TOTAL_ACCESS = 0, TOTAL_HIT = 0, TOTAL_MISS = 0, TOTAL_INSTR_MISS = 0;
+//         record_roi_stats(cpu, cache);
+
+//         for (uint32_t i = 0; i < NUM_TYPES; i++)
+//         {
+//             TOTAL_ACCESS += cache->roi_access[cpu][i];
+//             TOTAL_HIT += cache->roi_hit[cpu][i];
+//             TOTAL_MISS += cache->roi_miss[cpu][i];
+//             TOTAL_INSTR_MISS += cache->roi_instr_miss[cpu][i];
+//         }
+
+//         uint64_t num_instrs = ooo_cpu[cpu].finish_sim_instr;
+
+//         if (TOTAL_ACCESS != 0)
+//         {
+//             cout << cache->NAME;
+//             cout << " WARMUP TOTAL ACCESS: " << setw(10) << TOTAL_ACCESS << "  HIT: " << setw(10) << TOTAL_HIT << "  MISS: " << setw(10) << TOTAL_MISS << "  HIT %: " << setw(10) << ((double)TOTAL_HIT * 100 / TOTAL_ACCESS) << "  MISS %: " << setw(10) << ((double)TOTAL_MISS * 100 / TOTAL_ACCESS) << "   MPKI: " << ((double)TOTAL_MISS * 1000 / num_instrs) << endl;
+//         }
+
+//         if (cache->roi_access[cpu][0])
+//         {
+//             cout << cache->NAME;
+//             cout << " WARMUP LOAD      ACCESS: " << setw(10) << cache->roi_access[cpu][0] << "  HIT: " << setw(10) << cache->roi_hit[cpu][0] << "  MISS: " << setw(10) << cache->roi_miss[cpu][0] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][0] * 100 / cache->roi_access[cpu][0]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][0] * 100 / cache->roi_access[cpu][0]) << "   MPKI: " << ((double)cache->roi_miss[cpu][0] * 1000 / num_instrs) << endl; // << " T_ACCESS: " << setw(10) << cache->ACCESS[0] << " T_HIT: " << setw(10) << cache->HIT[0] << " T_MISS: " << setw(10) << cache->MISS[0] << " T_MSHR_MERGED: " << cache->MSHR_MERGED[0] << endl; //@Vishal: MSHR merged will give correct result for 1 core, multi_core will give whole sim
+
+//             if (cache->cache_type == IS_L2C)
+//             {
+//                 // Neelu: Instruction and Data loads.
+//                 cout << cache->NAME << " WARMUP DATA LOAD MPKI: " << ((double)(cache->roi_miss[cpu][0] - cache->roi_instr_miss[cpu][0]) * 1000 / num_instrs) << endl;
+//                 cout << cache->NAME << " WARMUP INSTRUCTION LOAD MPKI: " << ((double)(cache->roi_instr_miss[cpu][0]) * 1000 / num_instrs) << endl;
+//             }
+//         }
+
+//         if (cache->roi_access[cpu][1])
+//         {
+//             cout << cache->NAME;
+//             cout << " WARMUP RFO      ACCESS: " << setw(10) << cache->roi_access[cpu][1] << "  HIT: " << setw(10) << cache->roi_hit[cpu][1] << "  MISS: " << setw(10) << cache->roi_miss[cpu][1] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][1] * 100 / cache->roi_access[cpu][1]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][1] * 100 / cache->roi_access[cpu][1]) << "   MPKI: " << ((double)cache->roi_miss[cpu][1] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[1] << " T_HIT: " << setw(10) << cache->HIT[1] << " T_MISS: " << setw(10) << cache->MISS[1] << " T_MSHR_MERGED: " << cache->MSHR_MERGED[1] << endl;
+//         }
+
+//         if (cache->roi_access[cpu][2])
+//         {
+//             cout << cache->NAME;
+//             cout << "WARMUP PREFETCH  ACCESS: " << setw(10) << cache->roi_access[cpu][2] << "  HIT: " << setw(10) << cache->roi_hit[cpu][2] << "  MISS: " << setw(10) << cache->roi_miss[cpu][2] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][2] * 100 / cache->roi_access[cpu][2]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][2] * 100 / cache->roi_access[cpu][2]) << "   MPKI: " << ((double)cache->roi_miss[cpu][2] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[2] << " T_HIT: " << setw(10) << cache->HIT[2] << " T_MISS: " << setw(10) << cache->MISS[2] << " T_MSHR_MERGED: " << cache->MSHR_MERGED[2] << endl;
+
+//             // cout << "AGUS PREFETCH L1 MISS" << pf_miss_l1 << endl;
+
+//             if (cache->cache_type == IS_L2C)
+//             {
+//                 // Neelu: Instruction and Data loads.
+//                 cout << cache->NAME << " WARMUP  DATA PREFETCH MPKI: " << ((double)(cache->roi_miss[cpu][2] - cache->roi_instr_miss[cpu][2]) * 1000 / num_instrs) << endl;
+//                 cout << cache->NAME << " WARMUP  INSTRUCTION PREFETCH MPKI: " << ((double)(cache->roi_instr_miss[cpu][2]) * 1000 / num_instrs) << endl;
+//             }
+//         }
+
+//         if (cache->roi_access[cpu][3])
+//         {
+//             cout << cache->NAME;
+//             cout << " WARMUP WRITEBACK      ACCESS: " << setw(10) << cache->roi_access[cpu][3] << "  HIT: " << setw(10) << cache->roi_hit[cpu][3] << "  MISS: " << setw(10) << cache->roi_miss[cpu][3] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][3] * 100 / cache->roi_access[cpu][3]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][3] * 100 / cache->roi_access[cpu][3]) << "   MPKI: " << ((double)cache->roi_miss[cpu][3] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[3] << " T_HIT: " << setw(10) << cache->HIT[3] << " T_MISS: " << setw(10) << cache->MISS[3] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[3] << endl;
+//         }
+
+//         if (cache->roi_access[cpu][4])
+//         {
+//             cout << cache->NAME;
+//             cout << " WARMUP LOAD TRANSLATION ACCESS: " << setw(10) << cache->roi_access[cpu][4] << "  HIT: " << setw(10) << cache->roi_hit[cpu][4] << "  MISS: " << setw(10) << cache->roi_miss[cpu][4] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][4] * 100 / cache->roi_access[cpu][4]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][4] * 100 / cache->roi_access[cpu][4]) << "   MPKI: " << ((double)cache->roi_miss[cpu][4] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
+//         }
+
+//         if (cache->roi_access[cpu][5])
+//         {
+//             cout << cache->NAME;
+//             cout << " WARMUP PREFETCH TRANSLATION ACCESS: " << setw(10) << cache->roi_access[cpu][5] << "  HIT: " << setw(10) << cache->roi_hit[cpu][5] << "  MISS: " << setw(10) << cache->roi_miss[cpu][5] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][5] * 100 / cache->roi_access[cpu][5]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][5] * 100 / cache->roi_access[cpu][5]) << "   MPKI: " << ((double)cache->roi_miss[cpu][5] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
+//         }
+//         if (cache->roi_access[cpu][6])
+//         {
+//             cout << cache->NAME;
+//             cout << " WARMUP TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->roi_access[cpu][6] << "  HIT: " << setw(10) << cache->roi_hit[cpu][6] << "  MISS: " << setw(10) << cache->roi_miss[cpu][6] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][6] * 100 / cache->roi_access[cpu][6]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][6] * 100 / cache->roi_access[cpu][6]) << "   MPKI: " << ((double)cache->roi_miss[cpu][6] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
+//         }
+
+        // for(int i = 0; i < cache->NUM_SET; i++)
+        // {
+        //     for(int j = 0; j < cache->NUM_WAY; j++)
+        //     {
+        //         if(cache->block[i][j].valid == 1)
+        //         {
+        //             cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
+        //         }
+        //     }
+        // }
+
+        // std::cout << "In Conventional Cache by the end of warmup:" << std::endl;
+        // int totalLines = 0;
+        // for (auto &use : cache->num_uses_before_eviction)
+        // {
+        //     totalLines += use.second;
+        //     std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
+        // }
+        // std::cout << "Total number of lines: " << totalLines << std::endl;
+
+//         for (uint32_t i = 0; i < NUM_TYPES; i++)
+//         {
+//             cache->roi_access[cpu][i] = 0;
+//             cache->roi_hit[cpu][i] = 0;
+//             cache->roi_miss[cpu][i] = 0;
+//             cache->roi_instr_miss[cpu][i] = 0;
+//         }
+//     }
+// }
+
+
+
+void print_reuse_cache_warmup_statistics(uint32_t cpu, REUSE_CACHE_LLC* cache)
+{
+    int i = cpu;
+
+    // for (uint32_t i = 0; i < NUM_CPUS; i++)
+    // {
+    if(i == 0)
+    {
+        std::cout << "REUSE CACHE LLC WARMUP STATS" << std::endl;
+
+        std::cout << "CPU: " << i << std::endl;
+
+        uint64_t TOTAL_ACCESS = 0, TAG_MISS_DATA_MISS = 0, 
+                 TAG_HIT_DATA_MISS = 0, TAG_HIT_DATA_HIT = 0;
+        uint64_t DEMAND_ACCESS = 0, DEMAND_TAG_MISS_DATA_MISS = 0,
+                 DEMAND_TAG_HIT_DATA_MISS = 0, DEMAND_TAG_HIT_DATA_HIT = 0;
+
+        for (uint32_t j = 0; j < NUM_TYPES; j++)
+        {
+            TOTAL_ACCESS        += cache->sim_llc_access[i][j];
+            TAG_MISS_DATA_MISS  += cache->sim_llc_tag_miss_data_miss[i][j];
+            TAG_HIT_DATA_MISS   += cache->sim_llc_tag_hit_data_miss[i][j];
+            TAG_HIT_DATA_HIT    += cache->sim_llc_tag_hit_data_hit[i][j];
+        }
+
+        // load + rfo
+        for (uint32_t j = 0; j <= 1; j++)
+        {
+            DEMAND_ACCESS              += cache->sim_llc_access[i][j];
+            DEMAND_TAG_MISS_DATA_MISS  += cache->sim_llc_tag_miss_data_miss[i][j];
+            DEMAND_TAG_HIT_DATA_MISS   += cache->sim_llc_tag_hit_data_miss[i][j];
+            DEMAND_TAG_HIT_DATA_HIT    += cache->sim_llc_tag_hit_data_hit[i][j];
+        }
+
+        uint64_t TOTAL_MISS   = TAG_MISS_DATA_MISS + TAG_HIT_DATA_MISS;
+        uint64_t TOTAL_HIT    = TAG_HIT_DATA_HIT;
+        uint64_t DEMAND_MISS  = DEMAND_TAG_MISS_DATA_MISS + DEMAND_TAG_HIT_DATA_MISS;
+        uint64_t DEMAND_HIT   = DEMAND_TAG_HIT_DATA_HIT;
+
+        uint64_t num_instrs = ooo_cpu[i].finish_sim_instr;
+
+        if (TOTAL_ACCESS != 0)
+        {
+            cout << cache->NAME;
+            cout << " TOTAL     ACCESS: " << setw(10) << TOTAL_ACCESS << "  HIT: " << setw(10) << TOTAL_HIT << "  MISS: " << setw(10) << TOTAL_MISS << "  HIT %: " << setw(10) << ((double)TOTAL_HIT * 100 / TOTAL_ACCESS) << "  MISS %: " << setw(10) << ((double)TOTAL_MISS * 100 / TOTAL_ACCESS) << "   MPKI: " << ((double)TOTAL_MISS * 1000 / num_instrs) << endl;
+        }
+
+        if (DEMAND_ACCESS != 0)
+        {
+            cout << cache->NAME;
+            cout << " DEMAND     ACCESS: " << setw(10) << DEMAND_ACCESS << "  HIT: " << setw(10) << DEMAND_HIT << "  MISS: " << setw(10) << DEMAND_MISS << "  HIT %: " << setw(10) << ((double)DEMAND_HIT * 100 / DEMAND_ACCESS) << "  MISS %: " << setw(10) << ((double)DEMAND_MISS * 100 / DEMAND_ACCESS) << "   MPKI: " << ((double)DEMAND_MISS * 1000 / num_instrs) << endl;
+        }
+        // // int TOTAL_ACCESS = 0, TOTAL_TAG_MISS = 0, TOTAL_TAG_HIT = 0, TOTAL_DATA_MISS = 0, TOTAL_DATA_HIT = 0;
+        // int TOTAL_MISS = 0, TOTAL_HIT = 0;
+        // for (uint32_t j = 0; j < NUM_TYPES; j++)
+        // {
+        //     TOTAL_ACCESS += cache->ACCESS[j];
+        //     TOTAL_MISS += cache->MISS[j];
+        //     TOTAL_HIT += cache->HIT[j];
+        //     TOTAL_TAG_MISS += cache->sim_llc_tag_miss[i][j];
+        //     TOTAL_TAG_HIT += cache->sim_llc_tag_hit[i][j];
+        //     TOTAL_DATA_MISS += cache->sim_llc_data_miss[i][j];
+        //     TOTAL_DATA_HIT += cache->sim_llc_data_hit[i][j];
+        // }
+        // std::cout << "WARMUP TOTAL_ACCESS: " << TOTAL_ACCESS << "WARMUP TOTAL_MISS: " << TOTAL_MISS << "WARMUP TOTAL_HIT: " << TOTAL_HIT << std::endl;
+        // std::cout << "WARMUP TAG_MISS: " << TOTAL_TAG_MISS << " WARMUP TAG_HIT: " << TOTAL_TAG_HIT << std::endl;
+        // std::cout << "WARMUP DATA_MISS: " << TOTAL_DATA_MISS << " WARMUP DATA_HIT: " << TOTAL_DATA_HIT << std::endl;
+        // std::cout << "WARMUP MISSRATE: " << (double)TOTAL_MISS / TOTAL_ACCESS << std::endl;
+        // std::cout << "WARMUP HITRATE: " << (double)TOTAL_HIT / TOTAL_ACCESS << std::endl;
+
+        // cout << "LLC WARMUP LOAD      ACCESS: " << setw(10) << cache->ACCESS[0] << "  HIT: " << setw(10) << cache->HIT[0] << "  MISS: " << setw(10) << cache->MISS[0] << "  HIT %: " << setw(10) << ((double)cache->HIT[0] * 100 / cache->ACCESS[0]) << "  MISS %: " << setw(10) << ((double)cache->MISS[0] * 100 / cache->ACCESS[0]) << endl; 
+        // cout << "LLC WARMUP RFO      ACCESS: " << setw(10) << cache->ACCESS[1] << "  HIT: " << setw(10) << cache->HIT[1] << "  MISS: " << setw(10) << cache->MISS[1] << "  HIT %: " << setw(10) << ((double)cache->HIT[1] * 100 / cache->ACCESS[1]) << "  MISS %: " << setw(10) << ((double)cache->MISS[1] * 100 / cache->ACCESS[1]) << endl; 
+        // cout << "LLC WARMUP PREFETCH      ACCESS: " << setw(10) << cache->ACCESS[2] << "  HIT: " << setw(10) << cache->HIT[2] << "  MISS: " << setw(10) << cache->MISS[2] << "  HIT %: " << setw(10) << ((double)cache->HIT[2] * 100 / cache->ACCESS[2]) << "  MISS %: " << setw(10) << ((double)cache->MISS[2] * 100 /cache->ACCESS[2]) << endl; 
+        // cout << "LLC WARMUP WRITEBACK      ACCESS: " << setw(10) << cache->ACCESS[3] << "  HIT: " << setw(10) << cache->HIT[3] << "  MISS: " << setw(10) << cache->MISS[3] << "  HIT %: " << setw(10) << ((double)cache->HIT[3] * 100 / cache->ACCESS[3]) << "  MISS %: " << setw(10) << ((double)cache->MISS[3] * 100 / cache->ACCESS[3]) << endl; 
+        // cout << "LLC WARMUP LOAD TRANSLATION ACCESS: " << setw(10) << cache->ACCESS[4] << "  HIT: " << setw(10) << cache->HIT[4] << "  MISS: " << setw(10) << cache->MISS[4] << "  HIT %: " << setw(10) << ((double)cache->HIT[4] * 100 / cache->ACCESS[4]) << "  MISS %: " << setw(10) << ((double)cache->MISS[4] * 100 / cache->ACCESS[4]) << endl; 
+        // cout << "LLC WARMUP PREFETCH TRANSLATION ACCESS: " << setw(10) << cache->ACCESS[5] << "  HIT: " << setw(10) << cache->HIT[5] << "  MISS: " << setw(10) << cache->MISS[5] << "  HIT %: " << setw(10) << ((double)cache->HIT[5] * 100 / cache->ACCESS[5]) << "  MISS %: " << setw(10) << ((double)cache->MISS[5] * 100 / cache->ACCESS[5]) << endl; 
+        // cout << "LLC WARMUP TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->ACCESS[6] << "  HIT: " << setw(10) << cache->HIT[6] << "  MISS: " << setw(10) << cache->MISS[6] << "  HIT %: " << setw(10) << ((double)cache->HIT[6] * 100 / cache->ACCESS[6]) << "  MISS %: " << setw(10) << ((double)cache->MISS[6] * 100 / cache->ACCESS[6]) << endl; 
+        
+        // std::cout << "In Reuse Cache by the end of warmup:" << std::endl;
+
+        // for(int i = 0; i < cache->NUM_DATA_ARRAY_SETS; i++)
+        // {
+        //     for(int j = 0; j < cache->NUM_DATA_ARRAY_WAYS; j++)
+        //     {
+        //         if(cache->data_array[i][j].valid == 1)
+        //         {
+        //             cache->num_uses_before_eviction[cache->data_array[i][j].num_uses]++;
+        //         }
+        //     }
+        // }
+
+        // int totalLines = 0;
+        // for (auto &use : cache->num_uses_before_eviction)
+        // {
+        //     totalLines += use.second;
+        //     std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
+        // }
+        // std::cout << "Total number of lines: " << totalLines << std::endl;
+    }
+}
+
+
+void reset_reuse_cache_stats(uint32_t cpu, CACHE* cache)
+{
+    REUSE_CACHE_LLC* reuseCache  = dynamic_cast<REUSE_CACHE_LLC*>(cache);
+    print_reuse_cache_warmup_statistics(cpu,reuseCache);        // TODO: for now, its written for single core,cpu = 0;
+    reset_cache_stats(cpu, cache);
+    
+    for (uint32_t i = 0; i < NUM_TYPES; i++)
+    {
+        reuseCache->sim_llc_tag_miss_data_miss[cpu][i] = 0;
+        reuseCache->sim_llc_tag_hit_data_miss[cpu][i] = 0;
+        reuseCache->sim_llc_tag_hit_data_hit[cpu][i] = 0;
+        reuseCache->sim_llc_access[cpu][i] = 0;
+        // reuseCache->sim_llc_data_miss[cpu][i] = 0;
+    }
+
+    // for(auto &num_uses: reuseCache->num_uses_before_eviction)
+    // {
+    //     num_uses.second = 0;
+    // }
+    reuseCache->num_uses_before_eviction.clear();
+
+    for(int i = 0; i < reuseCache->NUM_DATA_ARRAY_SETS; i++)
+    {
+        for(int j = 0; j < reuseCache->NUM_DATA_ARRAY_WAYS; j++)
+        {
+            reuseCache->data_array[i][j].num_uses = 0;
+        }
+    }
+}
+
 
 void finish_warmup()
 {
@@ -484,9 +787,9 @@ void finish_warmup()
     elapsed_second -= (elapsed_hour * 3600 + elapsed_minute * 60);
 
     // reset core latency
-    SCHEDULING_LATENCY = 6;
+    SCHEDULING_LATENCY = 2;
     EXEC_LATENCY = 1;
-    DECODE_LATENCY = 2;
+    DECODE_LATENCY = 1;
     PAGE_TABLE_LATENCY = 100;
     SWAP_LATENCY = 100000;
 
@@ -518,6 +821,12 @@ void finish_warmup()
         ooo_cpu[i].sim_load_sent = 0;
         ooo_cpu[i].sim_store_gen = 0;
         ooo_cpu[i].sim_store_sent = 0;
+        ooo_cpu[i].sim_partial_RAW_hits = 0;
+
+        cout << "During warmup: " << endl;
+        cout << "mem instrs: " << ooo_cpu[i].memory_instrs_during_warmup << ", non mem instrs:" << ooo_cpu[i].non_memory_instrs_during_warmup << endl;
+        cout << "num_mem_loads_during_warmup = " << ooo_cpu[i].num_mem_loads_during_warmup << ", num_mem_stores_during_warmup = " << ooo_cpu[i].num_mem_stores_during_warmup << endl;
+        cout << "mem_loads_which_are_forwarded_during_warmup = " <<  ooo_cpu[i].mem_loads_which_are_forwarded_during_warmup << endl;
 
         reset_cache_stats(i, &ooo_cpu[i].ITLB);
         reset_cache_stats(i, &ooo_cpu[i].DTLB);
@@ -525,7 +834,9 @@ void finish_warmup()
         reset_cache_stats(i, &ooo_cpu[i].L1I);
         reset_cache_stats(i, &ooo_cpu[i].L1D);
         reset_cache_stats(i, &ooo_cpu[i].L2C);
-        reset_cache_stats(i, uncore.LLC);
+        // print_llc_warmup_stats(i, uncore.LLC);
+        // reset_cache_stats(i, uncore.LLC);
+        reset_reuse_cache_stats(i, uncore.LLC);
         reset_cache_stats(i, &ooo_cpu[i].BTB);
 
         //@Vishal: Reset MMU cache stats
@@ -572,12 +883,17 @@ void print_deadlock(uint32_t i)
     cout << " event: " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].event_cycle;
     cout << " current: " << current_core_cycle[i] << endl;
 
+    cout << "ROB HEAD: head = " << ooo_cpu[i].ROB.head << ", instr_id = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].instr_id << ", ip = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].ip << endl;
+     ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.head].print();
+    cout << "ROB TAIL: tail = " << ooo_cpu[i].ROB.tail << " , instr_id = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.tail].instr_id << ", ip = " << ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.tail].ip << endl;
+     ooo_cpu[i].ROB.entry[ooo_cpu[i].ROB.tail].print();
+
     // print LQ entry
-    cout << endl
+    cout << endl 
          << "Load Queue Entry" << endl;
     for (uint32_t j = 0; j < LQ_SIZE; j++)
     {
-        cout << "[LQ] entry: " << j << " instr_id: " << ooo_cpu[i].LQ.entry[j].instr_id << " address: " << hex << ooo_cpu[i].LQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].LQ.entry[j].translated << " fetched: " << +ooo_cpu[i].LQ.entry[i].fetched << endl;
+        cout << "[LQ] entry: " << j << " instr_id: " << ooo_cpu[i].LQ.entry[j].instr_id << " , virtual_address:" << hex << ooo_cpu[i].LQ.entry[j].virtual_address  <<" , address: " << hex << ooo_cpu[i].LQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].LQ.entry[j].translated << " fetched: " << +ooo_cpu[i].LQ.entry[j].fetched << ", producer_id: " << +ooo_cpu[i].LQ.entry[j].producer_id << endl;
     }
 
     // print SQ entry
@@ -585,7 +901,8 @@ void print_deadlock(uint32_t i)
          << "Store Queue Entry" << endl;
     for (uint32_t j = 0; j < SQ_SIZE; j++)
     {
-        cout << "[SQ] entry: " << j << " instr_id: " << ooo_cpu[i].SQ.entry[j].instr_id << " address: " << hex << ooo_cpu[i].SQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].SQ.entry[j].translated << " fetched: " << +ooo_cpu[i].SQ.entry[i].fetched << endl;
+        cout << "[SQ] entry: " << j << " instr_id: " << ooo_cpu[i].SQ.entry[j].instr_id <<  " , virtual_address:" << hex << ooo_cpu[i].SQ.entry[j].virtual_address  <<" , address: " << hex << ooo_cpu[i].SQ.entry[j].physical_address << dec << " translated: " << +ooo_cpu[i].SQ.entry[j].translated << " fetched: " << +ooo_cpu[i].SQ.entry[j].fetched << ", is ROB entry corresponding is_producer: " << +ooo_cpu[i].ROB.entry[ooo_cpu[i].SQ.entry[j].rob_index].is_producer << endl;
+        ooo_cpu[i].ROB.entry[ooo_cpu[i].SQ.entry[j].rob_index].print();
     }
 
     // print L1D MSHR entry
@@ -850,7 +1167,7 @@ uint64_t va_to_pa(uint32_t cpu, uint64_t instr_id, uint64_t va, uint64_t unique_
                 ooo_cpu[cpu].L1I.invalidate_entry(cl_addr);
                 ooo_cpu[cpu].L1D.invalidate_entry(cl_addr);
                 ooo_cpu[cpu].L2C.invalidate_entry(cl_addr);
-                uncore.LLC->invalidate_entry(cl_addr);
+                uncore.LLC.invalidate_entry(cl_addr);
             }
 
             // swap complete
@@ -1048,7 +1365,6 @@ int main(int argc, char **argv)
                 {"uncompressed_trace", no_argument, 0, 'u'},
                 {"traces", no_argument, 0, 't'},
                 {"context_switch", required_argument, 0, 's'},
-                {"reuse_cache_llc", no_argument, 0, 'r'},
                 {0, 0, 0, 0}};
 
         int option_index = 0;
@@ -1095,9 +1411,6 @@ int main(int argc, char **argv)
             reg_stack_pointer = 102;
             reg_flags = 64;
             break;
-        case 'r':
-            use_reuse_cache_llc = true;
-            break;
         default:
             abort();
         }
@@ -1111,8 +1424,17 @@ int main(int argc, char **argv)
     cout << "Simulation Instructions: " << simulation_instructions << endl;
     // cout << "Scramble Loads: " << (knob_scramble_loads ? "ture" : "false") << endl;
     cout << "Number of CPUs: " << NUM_CPUS << endl;
+
+#ifdef USE_REUSE_CACHE_LLC
+    cout << "LLC TAG ARRAY sets: " << REUSE_CACHE_TAG_ARRAY_SET << endl;
+    cout << "LLC TAG ARRAY ways: " << REUSE_CACHE_TAG_ARRAY_WAYS << endl;
+    cout << "LLC DATA ARRAY sets: " << REUSE_CACHE_DATA_ARRAY_SET << endl;
+    cout << "LLC DATA ARRAY ways: " << REUSE_CACHE_DATA_ARRAY_WAYS << endl;
+#else
     cout << "LLC sets: " << LLC_SET << endl;
     cout << "LLC ways: " << LLC_WAY << endl;
+#endif
+
 #ifdef CAPTURE_DYNAMIC_ENERGY_PROFILE
     cout << "PHASE_SIZE_IN_CYCLES: " << PHASE_SIZE_IN_CYCLES << endl;
 #endif
@@ -1121,6 +1443,11 @@ int main(int argc, char **argv)
         DRAM_MTPS = DRAM_IO_FREQ / 4;
     else
         DRAM_MTPS = DRAM_IO_FREQ;
+    
+    // cout << "dram: " << DRAM_IO_FREQ << endl;
+    // cout << "dram-mtps:" << DRAM_MTPS << endl;
+    // cout << "pq sizes: " << ITLB_PQ_SIZE << ", " << STLB_PQ_SIZE << endl;
+    // cout << "l1i size: " << L1I_SET << ", " << L1I_WAY << endl; 
 
     // DRAM access latency
     tRP = (uint32_t)((1.0 * tRP_DRAM_NANOSECONDS * CPU_FREQ) / 1000);
@@ -1420,13 +1747,13 @@ int main(int argc, char **argv)
         uncore.LLC->upper_level_dcache[i] = &ooo_cpu[i].L2C;
         uncore.LLC->lower_level = &uncore.DRAM;
 
-#ifndef USE_REUSE_CACHE_LLC
-        uncore.LLC->initialize_replacement = &CACHE::llc_initialize_replacement;
-        uncore.LLC->update_replacement_state = &CACHE::llc_update_replacement_state;
-        uncore.LLC->find_victim = &CACHE::llc_find_victim;
-        uncore.LLC->replacement_final_stats = &CACHE::llc_replacement_final_stats;
-        (uncore.LLC->*(uncore.LLC->initialize_replacement))();
-#endif
+// #ifndef USE_REUSE_CACHE_LLC             // as of now not handling here a switch option
+//         uncore.LLC->initialize_replacement = &CACHE::llc_initialize_replacement;
+//         uncore.LLC->update_replacement_state = &CACHE::llc_update_replacement_state;
+//         uncore.LLC->find_victim = &CACHE::llc_find_victim;
+//         uncore.LLC->replacement_final_stats = &CACHE::llc_replacement_final_stats;
+//         (uncore.LLC->*(uncore.LLC->initialize_replacement))();
+// #endif
 
         // OFF-CHIP DRAM
         uncore.DRAM.fill_level = FILL_DRAM;
@@ -1502,12 +1829,12 @@ int main(int argc, char **argv)
 
                 // LLC: rq_to_cache, prefetch_miss, wq_to_cache, total_miss, pq_to_cache
 
-                cache_data_tag_accesses[3][phase_id] = 0.8522517 * (uncore.LLC->RQ.TO_CACHE + uncore.LLC->sim_miss[i][2] + uncore.LLC->WQ.TO_CACHE + uncore.LLC->PQ.TO_CACHE);
+                cache_data_tag_accesses[3][phase_id] = 0.8522517 * (uncore.LLC->RQ.TO_CACHE + uncore.LLC->sim_miss[i][2] + uncore.LLC->WQ.TO_CACHE + uncore.LLC.PQ.TO_CACHE);
 
                 uint64_t total_miss = 0;
                 for (uint32_t j = 0; j < NUM_TYPES; j++)
                 {
-                    total_miss += uncore.LLC->sim_miss[i][j];
+                    total_miss += uncore.LLC.sim_miss[i][j];
                 }
 
                 cache_tag_accesses[3][phase_id] = 0.0229417 * total_miss;
@@ -1564,12 +1891,12 @@ int main(int argc, char **argv)
                 uint64_t llc_total_access = 0;
                 for (uint32_t j = 0; j < NUM_TYPES; j++)
                 {
-                    llc_total_access += uncore.LLC->sim_access[i][j];
+                    llc_total_access += uncore.LLC.sim_access[i][j];
                 }
 
                 interconnect_request[phase_id] = 1 * 0.8 * llc_total_access;
 
-                interconnect_response[phase_id] = 8 * 0.8 * (uncore.LLC->sim_access[i][3] + l2c_total_miss);
+                interconnect_response[phase_id] = 8 * 0.8 * (uncore.LLC.sim_access[i][3] + l2c_total_miss);
 
                 phase_id++;
             }
@@ -1629,7 +1956,6 @@ int main(int argc, char **argv)
                 uint32_t schedule_index = ooo_cpu[i].ROB.next_schedule;
                 if ((ooo_cpu[i].ROB.entry[schedule_index].scheduled == 0) && (ooo_cpu[i].ROB.entry[schedule_index].event_cycle <= current_core_cycle[i]))
                     ooo_cpu[i].schedule_instruction();
-
                 // execute
                 ooo_cpu[i].execute_instruction();
 
@@ -1692,9 +2018,9 @@ int main(int argc, char **argv)
                     cumulative_ipc = (1.0 * ooo_cpu[i].num_retired) / current_core_cycle[i];
                 float heartbeat_ipc = (1.0 * ooo_cpu[i].num_retired - ooo_cpu[i].last_sim_instr) / (current_core_cycle[i] - ooo_cpu[i].last_sim_cycle);
 
-                cout << "Heartbeat CPU " << i << " instructions: " << ooo_cpu[i].num_retired << " cycles: " << current_core_cycle[i];
-                cout << " heartbeat IPC: " << heartbeat_ipc << " cumulative IPC: " << cumulative_ipc;
-                cout << " (Simulation time: " << elapsed_hour << " hr " << elapsed_minute << " min " << elapsed_second << " sec) " << endl;
+                cout << "Heartbeat CPU " << i << " instructions: " << dec << ooo_cpu[i].num_retired << " cycles: " << current_core_cycle[i];
+                cout << " heartbeat IPC: " << dec << heartbeat_ipc << " cumulative IPC: " << cumulative_ipc;
+                cout << " (Simulation time: " << dec << elapsed_hour << " hr " << elapsed_minute << " min " << elapsed_second << " sec) " << endl;
                 ooo_cpu[i].next_print_instruction += STAT_PRINTING_PERIOD;
 
                 ooo_cpu[i].last_sim_instr = ooo_cpu[i].num_retired;
@@ -1761,6 +2087,7 @@ int main(int argc, char **argv)
                 ooo_cpu[i].roi_load_sent = ooo_cpu[i].sim_load_sent;
                 ooo_cpu[i].roi_store_gen = ooo_cpu[i].sim_store_gen;
                 ooo_cpu[i].roi_store_sent = ooo_cpu[i].sim_store_sent;
+                ooo_cpu[i].roi_partial_RAW_hits = ooo_cpu[i].sim_partial_RAW_hits;
 
                 record_roi_stats(i, &ooo_cpu[i].ITLB);
                 record_roi_stats(i, &ooo_cpu[i].DTLB);
@@ -1801,7 +2128,7 @@ int main(int argc, char **argv)
     cout << endl
          << "ChampSim completed all CPUs" << endl;
 
-    for(int i = 0; i < NUM_CPUS; i++)
+    for (int i = 0; i < NUM_CPUS; i++)
     {
         if (knob_uncompressed_trace)
         {
@@ -1812,13 +2139,13 @@ int main(int argc, char **argv)
             pclose(ooo_cpu[i].trace_file);
         }
     }
-    
+
     if (NUM_CPUS > 1)
     {
         cout << endl
              << "Total Simulation Statistics (not including warmup)" << endl;
         for (uint32_t i = 0; i < NUM_CPUS; i++)
-        {
+        {   
             cout << endl
                  << "CPU " << i << " cumulative IPC: " << (float)(ooo_cpu[i].num_retired - ooo_cpu[i].begin_sim_instr) / (current_core_cycle[i] - ooo_cpu[i].begin_sim_cycle);
             cout << " instructions: " << ooo_cpu[i].num_retired - ooo_cpu[i].begin_sim_instr << " cycles: " << current_core_cycle[i] - ooo_cpu[i].begin_sim_cycle << endl;
@@ -1855,6 +2182,7 @@ int main(int argc, char **argv)
             //@Vishal: print stats
             cout << endl;
             cout << "RAW hits: " << ooo_cpu[i].sim_RAW_hits << endl;
+            cout << "Partial RAW hits: " << ooo_cpu[i].sim_partial_RAW_hits << endl;
             cout << "Loads Generated: " << ooo_cpu[i].sim_load_gen << endl;
             cout << "Loads sent to L1D: " << ooo_cpu[i].sim_load_sent << endl;
             cout << "Stores Generated: " << ooo_cpu[i].sim_store_gen << endl;
@@ -1898,7 +2226,6 @@ int main(int argc, char **argv)
 
 #ifdef USE_REUSE_CACHE_LLC
         (uncore.LLC->*uncore.LLC->replacement_final_stats)();
-
 #else
         print_roi_stats(i, uncore.LLC);
 #endif

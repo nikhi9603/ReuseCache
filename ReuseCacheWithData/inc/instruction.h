@@ -6,7 +6,7 @@
 #define LQ_SIZE 128
 #define SQ_SIZE 72
 #define NUM_INSTR_DESTINATIONS_SPARC 4
-#define NUM_INSTR_DESTINATIONS 2
+#define NUM_INSTR_DESTINATIONS 4
 #define NUM_INSTR_SOURCES 4
 
 // special registers that help us identify branches
@@ -25,6 +25,9 @@
 #define BRANCH_OTHER 7
 
 #include "set.h"
+#include<iostream>
+#include <iomanip>
+using namespace std;
 
 class input_instr
 {
@@ -36,6 +39,8 @@ public:
     uint8_t is_branch;
     uint8_t branch_taken;
 
+    uint8_t instr_size;
+
     uint8_t destination_registers[NUM_INSTR_DESTINATIONS]; // output registers
     uint8_t source_registers[NUM_INSTR_SOURCES];           // input registers
 
@@ -45,21 +50,22 @@ public:
     uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS]; // output memory sizes
     uint8_t source_memory_size[NUM_INSTR_SOURCES];           // input memory sizes
 
-    unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS]; // output memory values
-    unsigned char *source_memory_value[NUM_INSTR_SOURCES];           // input memory values
+    unsigned char destination_memory_value[NUM_INSTR_DESTINATIONS][64]; // output memory values
+    unsigned char source_memory_value[NUM_INSTR_SOURCES][64];           // input memory values
 
     input_instr()
     {
         ip = 0;
         is_branch = 0;
         branch_taken = 0;
+        instr_size = 0;
 
         for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++)
         {
             source_registers[i] = 0;
             source_memory[i] = 0;
             source_memory_size[i] = 0;
-            source_memory_value[i] = nullptr;
+            // source_memory_value[i] = nullptr;
         }
 
         for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS; i++)
@@ -67,13 +73,15 @@ public:
             destination_registers[i] = 0;
             destination_memory[i] = 0;
             destination_memory_size[i] = 0;
-            destination_memory_value[i] = nullptr;
+            // destination_memory_value[i] = nullptr;
         }
+        memset(destination_memory_value, 0, sizeof(destination_memory_value));
+        memset(source_memory_value, 0, sizeof(source_memory_value));
     }
 
     static size_t get_basic_size()
     {
-        return sizeof(ip) + sizeof(is_branch) + sizeof(branch_taken) +
+        return sizeof(ip) + sizeof(is_branch) + sizeof(branch_taken) + sizeof(instr_size) +
                sizeof(destination_registers) + sizeof(source_registers);
     }
 
@@ -141,42 +149,44 @@ class ooo_model_instr
 public:
     uint64_t instr_id,
         ip,
-        fetch_producer,
+        // fetch_producer,
         producer_id,
-        translated_cycle,
-        fetched_cycle,
-        execute_begin_cycle,
-        retired_cycle,
-        event_cycle,
-        stall_begin_cycle, // Neelu: Adding to count number of stall cycles in ROB
-        load_stall_begin_cycle,
-        stall_begin_rob_occupancy; // Neelu: Adding to capture ROB occupancy at stall start.
+        // translated_cycle,
+        // fetched_cycle,
+        // execute_begin_cycle,
+        // retired_cycle,
+        event_cycle;
+        // stall_begin_cycle, // Neelu: Adding to count number of stall cycles in ROB
+        // load_stall_begin_cycle,
+        // stall_begin_rob_occupancy; // Neelu: Adding to capture ROB occupancy at stall start.
 
     uint8_t is_branch,
         is_memory,
         branch_taken,
+        instr_size,
         branch_mispredicted,
-        branch_prediction_made,
+        // branch_prediction_made,
         translated,
-        data_translated,
+        // data_translated,
         source_added[NUM_INSTR_SOURCES],
         destination_added[NUM_INSTR_DESTINATIONS_SPARC],
         is_producer,
         is_consumer,
         reg_RAW_producer,
         reg_ready,
-        mem_ready,
+        // mem_ready,
         asid[2],
         reg_RAW_checked[NUM_INSTR_SOURCES],
-        stall_flag,      // Neelu: To indicate all ROB  stalls.
-        load_stall_flag, // Neelu: Adding to indicate a load stall and that stall begin cycle has been updated already
-        retire_window_fellow_is_trouble,
+        // stall_flag,      // Neelu: To indicate all ROB  stalls.
+        // load_stall_flag, // Neelu: Adding to indicate a load stall and that stall begin cycle has been updated already
+        // retire_window_fellow_is_trouble,
         btb_miss = 0;
 
     uint8_t branch_type;
     uint64_t branch_target;
 
-    uint32_t fetched, scheduled;
+    uint8_t fetched, scheduled;
+    uint8_t line_fetched[2], line_translated[2], num_fetch_lines;     // used for instr packet (ifetch buffer entries) to mark fetch status if instruction spans across two cache lines
     int num_reg_ops, num_mem_ops, num_reg_dependent;
 
     // executed bit is set after all dependencies are eliminated and this instr is chosen on a cycle, according to EXEC_WIDTH
@@ -203,8 +213,8 @@ public:
     uint8_t destination_memory_size[NUM_INSTR_DESTINATIONS_SPARC];
     uint8_t source_memory_size[NUM_INSTR_SOURCES];
 
-    unsigned char *destination_memory_value[NUM_INSTR_DESTINATIONS_SPARC];
-    unsigned char *source_memory_value[NUM_INSTR_SOURCES];
+    unsigned char destination_memory_value[NUM_INSTR_DESTINATIONS_SPARC][64];
+    unsigned char source_memory_value[NUM_INSTR_SOURCES][64];
 
     // keep around a record of what the original virtual addresses were
     uint64_t destination_virtual_address[NUM_INSTR_DESTINATIONS_SPARC];
@@ -215,37 +225,39 @@ public:
 
     // these are indices of instructions in the ROB that depend on me
     // uint8_t memory_instrs_depend_on_me[ROB_SIZE];
-    fastset memory_instrs_depend_on_me;
+    fastset memory_instrs_depend_on_me[2*NUM_INSTR_DESTINATIONS_SPARC]; // full overlap loads
+    fastset partial_mem_overlap_instrs_depend_on_me[2*NUM_INSTR_DESTINATIONS_SPARC];
 
-    uint32_t lq_index[NUM_INSTR_SOURCES],
-        sq_index[NUM_INSTR_DESTINATIONS_SPARC],
-        forwarding_index[NUM_INSTR_DESTINATIONS_SPARC];
+    uint32_t lq_index[2*NUM_INSTR_SOURCES],
+        sq_index[2*NUM_INSTR_DESTINATIONS_SPARC],
+        forwarding_index[NUM_INSTR_DESTINATIONS_SPARC]; // TODO:: Are we using this? (Currently no) If yes, check whether size of this should be twice of num of destinations
 
     ooo_model_instr()
     {
         instr_id = 0;
         ip = 0;
-        fetch_producer = 0;
+        // fetch_producer = 0;
         producer_id = 0;
-        translated_cycle = 0;
-        fetched_cycle = 0;
-        execute_begin_cycle = 0;
-        retired_cycle = 0;
+        // translated_cycle = 0;
+        // fetched_cycle = 0;
+        // execute_begin_cycle = 0;
+        // retired_cycle = 0;
         event_cycle = 0;
-        stall_begin_cycle = 0;
-        load_stall_begin_cycle = 0;
-        stall_begin_rob_occupancy = 0;
-        load_stall_flag = 0;
-        stall_flag = 0;
-        retire_window_fellow_is_trouble = 0;
+        // stall_begin_cycle = 0;
+        // load_stall_begin_cycle = 0;
+        // stall_begin_rob_occupancy = 0;
+        // load_stall_flag = 0;
+        // stall_flag = 0;
+        // retire_window_fellow_is_trouble = 0;
 
         is_branch = 0;
         is_memory = 0;
         branch_taken = 0;
+        instr_size = 0;
         branch_mispredicted = 0;
-        branch_prediction_made = 0;
+        // branch_prediction_made = 0;
         translated = 0;
-        data_translated = 0;
+        // data_translated = 0;
         is_producer = 0;
         is_consumer = 0;
         reg_RAW_producer = 0;
@@ -253,7 +265,7 @@ public:
         scheduled = 0;
         executed = 0;
         reg_ready = 0;
-        mem_ready = 0;
+        // mem_ready = 0;
         asid[0] = UINT8_MAX;
         asid[1] = UINT8_MAX;
 
@@ -269,25 +281,39 @@ public:
         num_mem_ops = 0;
         num_reg_dependent = 0;
 
+        line_fetched[0] = 0;
+        line_fetched[1] = 0;
+        line_translated[0] = 0;
+        line_translated[1] = 0;
+        num_fetch_lines = 0;
+
         for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++)
         {
             source_registers[i] = 0;
             source_memory[i] = 0;
+            source_memory_size[i] = 0;
+            // source_memory_value[i] = nullptr;
             source_virtual_address[i] = 0;
             source_added[i] = 0;
             lq_index[i] = UINT32_MAX;
+            lq_index[i+NUM_INSTR_SOURCES] = UINT32_MAX;
             reg_RAW_checked[i] = 0;
         }
 
         for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
         {
             destination_memory[i] = 0;
+            destination_memory_size[i] = 0;
+            // destination_memory_value[i] = nullptr;
             destination_registers[i] = 0;
             destination_virtual_address[i] = 0;
             destination_added[i] = 0;
             sq_index[i] = UINT32_MAX;
+            sq_index[i+NUM_INSTR_SOURCES] = UINT32_MAX;
             forwarding_index[i] = 0;
         }
+        memset(source_memory_value, 0, sizeof(source_memory_value));
+        memset(destination_memory_value, 0, sizeof(destination_memory_value));
 
 #if 0
         for (uint32_t i=0; i<ROB_SIZE; i++) {
@@ -299,6 +325,95 @@ public:
         }
 #endif
     };
+
+    void print()
+    {
+        cout << "-------------------" << endl;
+        cout << "IP: 0x" << hex << ip << dec << endl;
+        cout << "Instr_id: " << instr_id << endl;
+
+        cout << "has_mem: " << (int)is_memory
+            << ", is_branch: " << (int)is_branch << endl;
+
+        cout << "branch_taken: " << (int)branch_taken << endl;
+
+        cout << "instr_size: " << (int)instr_size << endl;
+
+        cout << "Destination Registers: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+            cout << (int)destination_registers[i] << " ";
+        cout << endl;
+
+        cout << "Source Registers: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << (int)source_registers[i] << " ";
+        cout << endl;
+
+        // Memory addresses (always print like trace style)
+        cout << "Source Memory Addresses: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << "0x" << hex << source_memory[i] << " ";
+        cout << dec << endl;
+
+        cout << "Destination Memory Addresses: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+            cout << "0x" << hex << destination_memory[i] << " ";
+        cout << dec << endl;
+
+        // Memory sizes
+        cout << "Source Memory Sizes: ";
+        for (int i = 0; i < NUM_INSTR_SOURCES; i++)
+            cout << (int)source_memory_size[i] << " ";
+        cout << endl;
+
+        cout << "Destination Memory Sizes: ";
+        for (int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+            cout << (int)destination_memory_size[i] << " ";
+        cout << endl;
+
+        cout << "Source memory values" << endl;
+        cout << hex;
+        for(int i = 0; i < NUM_INSTR_SOURCES; i++)
+        {
+            for (uint32_t j = 0; j < source_memory_size[i]; j++) {
+                cout << setw(2) << setfill('0')
+                    << (int)source_memory_value[i][j] << " ";
+            }
+            cout << ",  " ;
+        }
+        cout << endl;
+
+        cout << "Destination memory values" << endl;
+        cout << hex;
+        for(int i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++)
+        {
+            for (uint32_t j = 0; j < destination_memory_size[i]; j++) {
+                cout << setw(2) << setfill('0')
+                    << (int)destination_memory_value[i][j] << " ";
+            }
+            cout << ",  " ;
+        }
+        cout << endl;
+
+        cout << "---------------------" << endl;
+    }
+
+    // void free_data() 
+    // {
+    //     for (uint32_t i = 0; i < NUM_INSTR_SOURCES; i++) {
+    //         if (source_memory_value[i]) {
+    //             delete[] source_memory_value[i];
+    //             source_memory_value[i] = nullptr;
+    //         }
+    //     }
+
+    //     for (uint32_t i = 0; i < NUM_INSTR_DESTINATIONS_SPARC; i++) {
+    //         if (destination_memory_value[i]) {
+    //             delete[] destination_memory_value[i];
+    //             destination_memory_value[i] = nullptr;
+    //         }
+    //     }
+    // }
 };
 
 #endif

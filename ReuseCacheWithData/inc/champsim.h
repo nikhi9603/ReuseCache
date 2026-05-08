@@ -62,14 +62,14 @@
 #define NUM_CPUS 1
 #define CPU_FREQ 4000
 // #define DRAM_IO_FREQ 6400	//1600	Neelu: Changed
-#define DRAM_IO_FREQ 6400
+#define DRAM_IO_FREQ 3200
 #define PAGE_SIZE 4096
 #define LOG2_PAGE_SIZE 12
 
 // CACHE
 #define BLOCK_SIZE 64
 #define LOG2_BLOCK_SIZE 6
-#define BLOCK_OFFSET_MASK BLOCK_SIZE - 1
+#define BLOCK_OFFSET_MASK (BLOCK_SIZE - 1)
 #define MAX_READ_PER_CYCLE 8
 #define MAX_FILL_PER_CYCLE 1
 

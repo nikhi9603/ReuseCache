@@ -40,6 +40,8 @@ public:
     bool nru;                        // only for data array
     BLOCK *forward_backward_pointer; // forward pointer to data array in case of tag array
                                      // backward pointer to tag array in case of data array
+    unsigned char data_value[64];
+    // bool *data_valid;
 
     BLOCK()
     {
@@ -68,8 +70,16 @@ public:
         num_uses = 0;
 
         hasData = false;
-        nrr = -1;
+        nrr = 1;
+        nru = 1;
         forward_backward_pointer = nullptr;
+        // data_value = new unsigned char[BLOCK_SIZE];
+        // data_valid = new bool[BLOCK_SIZE];
+        for (uint32_t i = 0; i < BLOCK_SIZE; i++)
+        {
+            data_value[i] = 0;
+            // data_valid[i] = false;
+        }
     };
 };
 
@@ -98,12 +108,12 @@ public:
         translated,
         fetched,
         prefetched,
-        drc_tag_read,
+        // drc_tag_read,
         critical_ip_flag; // Neelu: Adding to indicate that current packet's ip has been identified as critical.
 
     int fill_level,
         pf_origin_level,
-        rob_signal,
+        // rob_signal,
         rob_index,
         producer,
         delta,
@@ -160,6 +170,10 @@ public:
         event_cycle,
         cycle_enqueued;
 
+    unsigned char data_value[64];
+    uint8_t data_size;
+    uint64_t block_offset;
+
     PACKET()
     {
         instruction = 0;
@@ -172,7 +186,7 @@ public:
         translated = 0;
         fetched = 0;
         prefetched = 0;
-        drc_tag_read = 0;
+        // drc_tag_read = 0;
         send_both_tlb = 0;
         send_both_cache = 0;
         late_pref = 0;
@@ -186,7 +200,7 @@ public:
 
         fill_level = -1;
         pf_origin_level = -1;
-        rob_signal = -1;
+        // rob_signal = -1;
         rob_index = -1;
         producer = -1;
         delta = 0;
@@ -229,6 +243,11 @@ public:
         l1_pq_index = -1;
         full_physical_address = 0;
         send_both_tlb = false;
+
+        // data_value = nullptr;
+        memset(data_value, 0, sizeof(data_value));
+        data_size = 0;
+        block_offset = 0;
     };
 };
 
@@ -347,16 +366,16 @@ public:
         head,
         tail,
         occupancy,
-        last_read, last_fetch, last_scheduled,
-        inorder_fetch[2],
-        next_fetch[2],
+        // last_read, last_fetch, last_scheduled,
+        // inorder_fetch[2],
+        // next_fetch[2],
         next_schedule;
-    uint64_t event_cycle,
-        fetch_event_cycle,
-        schedule_event_cycle,
-        execute_event_cycle,
-        lsq_event_cycle,
-        retire_event_cycle;
+    uint64_t event_cycle;
+        // fetch_event_cycle,
+        // schedule_event_cycle,
+        // execute_event_cycle,
+        // lsq_event_cycle,
+        // retire_event_cycle;
 
     ooo_model_instr *entry;
 
@@ -367,22 +386,22 @@ public:
         tail = 0;
         occupancy = 0;
 
-        last_read = SIZE - 1;
-        last_fetch = SIZE - 1;
-        last_scheduled = 0;
+        // last_read = SIZE - 1;
+        // last_fetch = SIZE - 1;
+        // last_scheduled = 0;
 
-        inorder_fetch[0] = 0;
-        inorder_fetch[1] = 0;
-        next_fetch[0] = 0;
-        next_fetch[1] = 0;
+        // inorder_fetch[0] = 0;
+        // inorder_fetch[1] = 0;
+        // next_fetch[0] = 0;
+        // next_fetch[1] = 0;
         next_schedule = 0;
 
         event_cycle = 0;
-        fetch_event_cycle = UINT64_MAX;
-        schedule_event_cycle = UINT64_MAX;
-        execute_event_cycle = UINT64_MAX;
-        lsq_event_cycle = UINT64_MAX;
-        retire_event_cycle = UINT64_MAX;
+        // fetch_event_cycle = UINT64_MAX;
+        // schedule_event_cycle = UINT64_MAX;
+        // execute_event_cycle = UINT64_MAX;
+        // lsq_event_cycle = UINT64_MAX;
+        // retire_event_cycle = UINT64_MAX;
 
         entry = new ooo_model_instr[SIZE];
     };
@@ -406,13 +425,15 @@ public:
         event_cycle;
 
     uint32_t rob_index, data_index, sq_index;
+    uint32_t block_offset, data_size;
+    unsigned char data_value[64];
 
     uint8_t translated,
         fetched,
         asid[2];
     // forwarding_depend_on_me[ROB_SIZE];
-    fastset
-        forwarding_depend_on_me;
+    // fastset
+    //     forwarding_depend_on_me;
 
     // constructor
     LSQ_ENTRY()
@@ -433,6 +454,10 @@ public:
         asid[0] = UINT8_MAX;
         asid[1] = UINT8_MAX;
 
+        block_offset = 0;
+        data_size = 0;
+        // data_value = nullptr;
+        memset(data_value, 0, sizeof(data_value));
 #if 0
         for (uint32_t i=0; i<ROB_SIZE; i++)
             forwarding_depend_on_me[i] = 0;

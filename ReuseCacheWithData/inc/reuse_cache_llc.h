@@ -6,9 +6,9 @@
 #include <map>
 
 // REUSE CACHE PARAMETERS
-#define REUSE_CACHE_TAG_ARRAY_SET 4096
+#define REUSE_CACHE_TAG_ARRAY_SET 8192
 #define REUSE_CACHE_TAG_ARRAY_WAYS 16
-#define REUSE_CACHE_DATA_ARRAY_SET 1024
+#define REUSE_CACHE_DATA_ARRAY_SET 4096
 #define REUSE_CACHE_DATA_ARRAY_WAYS 16
 
 class REUSE_CACHE_LLC : public CACHE
@@ -17,12 +17,13 @@ public:
     const uint32_t NUM_TAG_ARRAY_WAYS, NUM_TAG_ARRAY_SETS, NUM_DATA_ARRAY_WAYS, NUM_DATA_ARRAY_SETS;
     BLOCK **tag_array;
     BLOCK **data_array;
+    uint8_t *rr_ptr_tag_array;    // round-robin like ptr for NRR replacement for each set
 
     uint64_t sim_llc_access[NUM_CPUS][NUM_TYPES],
-        sim_llc_tag_miss[NUM_CPUS][NUM_TYPES],
-        sim_llc_tag_hit[NUM_CPUS][NUM_TYPES],
-        sim_llc_data_miss[NUM_CPUS][NUM_TYPES],
-        sim_llc_data_hit[NUM_CPUS][NUM_TYPES];
+        sim_llc_tag_miss_data_miss[NUM_CPUS][NUM_TYPES],      // tag miss(so no data)
+        sim_llc_tag_hit_data_miss[NUM_CPUS][NUM_TYPES],       // only tag hit and data miss
+        // sim_llc_data_miss[NUM_CPUS][NUM_TYPES],     
+        sim_llc_tag_hit_data_hit[NUM_CPUS][NUM_TYPES];      // tag hit and has data
 
     map<uint64_t, uint32_t> num_uses_before_eviction;
 
@@ -30,15 +31,28 @@ public:
         : CACHE(name, 0, 0, 0, wq_size, rq_size, pq_size, mshr_size), NUM_TAG_ARRAY_WAYS(num_tag_array_ways), NUM_TAG_ARRAY_SETS(num_tag_array_sets), NUM_DATA_ARRAY_WAYS(num_data_array_ways), NUM_DATA_ARRAY_SETS(num_data_array_sets)
     {
         tag_array = new BLOCK *[NUM_TAG_ARRAY_SETS];
+        rr_ptr_tag_array = new uint8_t[NUM_TAG_ARRAY_SETS];
+
         for (uint32_t i = 0; i < NUM_TAG_ARRAY_SETS; i++)
         {
             tag_array[i] = new BLOCK[NUM_TAG_ARRAY_WAYS];
+            rr_ptr_tag_array[i] = 0;
+
+            for (uint32_t j = 0; j < NUM_TAG_ARRAY_WAYS; j++)
+            {
+                tag_array[i][j].lru = j;
+            }
         }
 
         data_array = new BLOCK *[NUM_DATA_ARRAY_SETS];
         for (uint32_t i = 0; i < NUM_DATA_ARRAY_SETS; i++)
         {
             data_array[i] = new BLOCK[NUM_DATA_ARRAY_WAYS];
+
+            for (uint32_t j = 0; j < NUM_DATA_ARRAY_WAYS; j++)
+            {
+                data_array[i][j].lru = j;
+            }
         }
 
         for (uint32_t i = 0; i < NUM_CPUS; i++)
@@ -46,10 +60,10 @@ public:
             for (uint32_t j = 0; j < NUM_TYPES; j++)
             {
                 sim_llc_access[i][j] = 0;
-                sim_llc_tag_miss[i][j] = 0;
-                sim_llc_tag_hit[i][j] = 0;
-                sim_llc_data_miss[i][j] = 0;
-                sim_llc_data_hit[i][j] = 0;
+                sim_llc_tag_miss_data_miss[i][j] = 0;
+                sim_llc_tag_hit_data_miss[i][j] = 0;
+                // sim_llc_data_miss[i][j] = 0;
+                sim_llc_tag_hit_data_hit[i][j] = 0;
             }
         }
 
@@ -78,6 +92,10 @@ public:
 
     uint32_t reuse_cache_llc_find_tag_array_victim(uint32_t tag_array_set),
         reuse_cache_llc_find_data_array_victim(uint32_t data_array_set);
+    
+
+    void update_reuse_cache_data_replacement_state(BLOCK* data_block, uint32_t data_array_set, uint32_t type, uint8_t hit);
+    uint32_t get_data_array_set(uint32_t tag_array_set);
 };
 
 #endif

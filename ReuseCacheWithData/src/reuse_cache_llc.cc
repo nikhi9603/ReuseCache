@@ -1,4 +1,5 @@
 #include "reuse_cache_llc.h"
+#include "ooo_cpu.h"
 
 void REUSE_CACHE_LLC::handle_fill()
 {
@@ -13,20 +14,20 @@ void REUSE_CACHE_LLC::handle_fill()
         auto tag_array_set = get_set(MSHR.entry[mshr_index].address);
         int tag_way = check_tag_hit(&MSHR.entry[mshr_index]);
 
-        int filled;
+        int filled = 0;
 
         // fills generated from misses. So the data is not present in the cache but tag may be present
         if (tag_way != NUM_TAG_ARRAY_WAYS)
         { // tag already present, but data not present
             filled = fill_cache_data(tag_array_set, tag_way, &MSHR.entry[mshr_index]);
             if (filled)
-                sim_llc_tag_hit[fill_cpu][MSHR.entry[mshr_index].type]++;
+                sim_llc_tag_hit_data_miss[fill_cpu][MSHR.entry[mshr_index].type]++;
         }
         else
         { // tag not present
             filled = fill_cache_tag(tag_array_set, &MSHR.entry[mshr_index]);
             if (filled)
-                sim_llc_tag_miss[fill_cpu][MSHR.entry[mshr_index].type]++;
+                sim_llc_tag_miss_data_miss[fill_cpu][MSHR.entry[mshr_index].type]++;
         }
 
         if (filled)
@@ -39,16 +40,31 @@ void REUSE_CACHE_LLC::handle_fill()
                     upper_level_dcache[fill_cpu]->return_data(&MSHR.entry[mshr_index]);
             }
 
-            MSHR.remove_queue(&MSHR.entry[mshr_index]);
             MSHR.num_returned--;
+
+            // ACCESS[MSHR.entry[mshr_index].type]++;       for now not using these counters
+            // MISS[MSHR.entry[mshr_index].type]++;
+
+            if (warmup_complete[fill_cpu])
+            {
+                uint64_t current_miss_latency = (current_core_cycle[fill_cpu] - MSHR.entry[mshr_index].cycle_enqueued);
+                if (MSHR.entry[mshr_index].cycle_enqueued > 0)
+                    total_miss_latency += current_miss_latency;
+            }
 
             sim_llc_access[fill_cpu][MSHR.entry[mshr_index].type]++;
 
-            ACCESS[MSHR.entry[mshr_index].type]++;
-            MISS[MSHR.entry[mshr_index].type]++;
+        //             if (warmup_complete[fill_cpu])
+        // {
+        // cout << "Handle fill accesses: " << sim_llc_access[fill_cpu][MSHR.entry[mshr_index].type] << endl;
+        // cout << "Handle fill misses: " << sim_llc_tag_miss_data_miss[fill_cpu][MSHR.entry[mshr_index].type] << ", " << sim_llc_tag_hit_data_miss[fill_cpu][MSHR.entry[mshr_index].type] << endl;
+        // cout << "Handle fill hits: " << sim_llc_tag_hit_data_hit[fill_cpu][MSHR.entry[mshr_index].type] << endl;
+        // }
+            MSHR.remove_queue(&MSHR.entry[mshr_index]);
 
             update_fill_cycle();
         }
+
     }
 }
 
@@ -61,12 +77,15 @@ void REUSE_CACHE_LLC::handle_writeback()
     if (writeback_cpu == NUM_CPUS)
         return;
 
-    if (WQ.entry[WQ.head].event_cycle <= current_core_cycle[writeback_cpu])
+    bool isBypass = false;      // only for writebacks which has no tag
+
+    if ((WQ.entry[WQ.head].event_cycle <= current_core_cycle[writeback_cpu]) && (WQ.occupancy > 0))
     {
         uint32_t index = WQ.head;
 
         auto tag_array_set = get_set(WQ.entry[index].address);
         auto tag_way = check_tag_hit(&WQ.entry[index]);
+        auto data_array_set = get_data_array_set(tag_array_set);
 
         int filled = 0;
 
@@ -74,72 +93,126 @@ void REUSE_CACHE_LLC::handle_writeback()
         {
             if (tag_array[tag_array_set][tag_way].hasData) // data hit
             {
-                tag_array[tag_array_set][tag_way].nrr = 0;
-                tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
-                tag_array[tag_array_set][tag_way].forward_backward_pointer->nru = 1;
                 filled = 1;
+                sim_llc_tag_hit_data_hit[writeback_cpu][WQ.entry[index].type]++;
+                update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 1);
             }
             else // data miss
             {
                 filled = fill_cache_data(tag_array_set, tag_way, &WQ.entry[index]);
-
-                if (filled)
+                if(filled)
                 {
-                    tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
+                    sim_llc_tag_hit_data_miss[writeback_cpu][WQ.entry[index].type]++;
+                    update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 0);
                 }
             }
 
-            if (filled)
-                sim_llc_tag_hit[writeback_cpu][WQ.entry[index].type]++;
+            if(filled)
+            {
+                tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
+                // TODO:: I need to handle data memcpy here later. (for isdata)
+                // update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 1);
+                tag_array[tag_array_set][tag_way].forward_backward_pointer->num_uses++;
+            }
+
         }
         else // tag miss
         {
-            if (lower_level)
+            if (lower_level && WQ.entry[index].type == WRITEBACK)
             {
-                if (lower_level->get_occupancy(2, WQ.entry[index].address) == lower_level->get_size(2, WQ.entry[index].address))
+                if (lower_level->get_occupancy(2, WQ.entry[index].address) >= lower_level->get_size(2, WQ.entry[index].address) - 1) /// filling tag can have a victim which is dirty and if no space is there again this will be added in next run
                 {
                     // lower level WQ is full, cannot replace this victim
-                    filled = 0;
                     lower_level->increment_WQ_FULL(WQ.entry[index].address);
                     STALL[WQ.entry[index].type]++;
+                    filled = 0;
                 }
                 else
                 {
+                    filled = 1;
                     PACKET writeback_packet;
+                    writeback_packet = WQ.entry[index];
 
                     writeback_packet.fill_level = fill_level << 1;
-                    writeback_packet.cpu = writeback_cpu;
+                    writeback_packet.cpu = WQ.entry[index].cpu;
                     writeback_packet.address = WQ.entry[index].address;
                     writeback_packet.full_addr = WQ.entry[index].full_addr;
                     writeback_packet.data = WQ.entry[index].data;
-                    writeback_packet.instr_id = WQ.entry[index].instr_id;
-                    writeback_packet.ip = 0;
+                    writeback_packet.instr_id = 0;
+                    writeback_packet.ip = 0; // writeback does not have ip
                     writeback_packet.type = WRITEBACK;
-                    writeback_packet.event_cycle = current_core_cycle[writeback_cpu];
+                    writeback_packet.event_cycle = current_core_cycle[WQ.entry[index].cpu];
+                    writeback_packet.data_size = WQ.entry[index].data_size;     // anyways data value is not valid.. think of this how to handle as we thought writeback request is of block size
+                    writeback_packet.block_offset = WQ.entry[index].block_offset;
+            //         // writeback_packet.data_value = WQ.entry[index].data_value;        // todo:: data value is array, memcopy it later
 
                     lower_level->add_wq(&writeback_packet);
-
-                    filled = 1;
                 }
+            }
+            else if(lower_level && WQ.entry[index].type == RFO)     // does this happen? RFO requests come to LLC through RQ right? only at L1D wq right?
+            {
+                cout << "This shouldn't happen RFO" << endl;
+                if (lower_level->get_occupancy(2, WQ.entry[index].address) >= lower_level->get_size(2, WQ.entry[index].address) - 1) /// filling tag can have a victim which is dirty and if no space is there again this will be added in next run
+                {
+                    // lower level WQ is full, cannot replace this victim
+                    lower_level->increment_WQ_FULL(WQ.entry[index].address);
+                    STALL[WQ.entry[index].type]++;
+                    filled = 0;
+                }
+                                else
+                {
+                    filled = 1;
+                    PACKET new_packet;
+                    new_packet = WQ.entry[index];
+
+                    new_packet.fill_level = fill_level << 1;
+                    new_packet.cpu = WQ.entry[index].cpu;
+                    new_packet.address = WQ.entry[index].address;
+                    new_packet.full_addr = WQ.entry[index].full_addr;
+                    new_packet.data = WQ.entry[index].data;
+                    new_packet.instr_id = 0;
+                    new_packet.ip = 0; // writeback does not have ip
+                    new_packet.type = RFO;
+                    new_packet.event_cycle = current_core_cycle[WQ.entry[index].cpu];
+                    new_packet.data_size = WQ.entry[index].data_size;     // anyways data value is not valid.. think of this how to handle as we thought writeback request is of block size
+                    new_packet.block_offset = WQ.entry[index].block_offset;
+            //         // writeback_packet.data_value = WQ.entry[index].data_value;        // todo:: data value is array, memcopy it later
+
+                    lower_level->add_rq(&new_packet);
+                }
+            }
+            else
+            {
+                cout << "This also cant happen" << endl;
             }
 
             if (filled)
-                filled &= fill_cache_tag(tag_array_set, &WQ.entry[index]);
-
+                filled =  fill_cache_tag(tag_array_set, &WQ.entry[index]);      
+            isBypass = true;        // not using anywhere just kept ot identify above request is bypass request
             if (filled)
-                sim_llc_tag_miss[writeback_cpu][WQ.entry[index].type]++;
+                sim_llc_tag_miss_data_miss[writeback_cpu][WQ.entry[index].type]++;
         }
 
         if (filled)
         {
+            if (WQ.entry[index].fill_level < fill_level)
+            {
+                cout << "This also cant happen 2" << endl;
+                if (WQ.entry[index].instruction)
+                    upper_level_icache[writeback_cpu]->return_data(&WQ.entry[index]);
+                if (WQ.entry[index].is_data)
+                    upper_level_dcache[writeback_cpu]->return_data(&WQ.entry[index]);
+            }
+
             sim_llc_access[writeback_cpu][WQ.entry[index].type]++;
 
-            ACCESS[WQ.entry[index].type]++;
-            if (tag_way != NUM_TAG_ARRAY_WAYS)
-                HIT[WQ.entry[index].type]++;
-            else
-                MISS[WQ.entry[index].type]++;
-
+            
+        //     if (warmup_complete[writeback_cpu])
+        // {
+        // cout << "Handle write accesses: " << sim_llc_access[writeback_cpu][WQ.entry[index].type] << endl;
+        // cout << "Handle write misses: " << sim_llc_tag_miss_data_miss[writeback_cpu][WQ.entry[index].type] << ", " << sim_llc_tag_hit_data_miss[writeback_cpu][WQ.entry[index].type] << endl;
+        // cout << "Handle write hits: " << sim_llc_tag_hit_data_hit[writeback_cpu][WQ.entry[index].type] << endl;
+        // }
             WQ.remove_queue(&WQ.entry[index]);
         }
     }
@@ -164,11 +237,14 @@ void REUSE_CACHE_LLC::handle_read()
             int tag_way = check_tag_hit(&RQ.entry[index]);
             int way = check_hit(&RQ.entry[RQ.head]);
 
-            if (way >= 0)
+            uint32_t data_array_set = get_data_array_set(tag_array_set);
+
+            if (way >= 0)       // data hit
             {
                 tag_array[tag_array_set][way].used = 1;
                 tag_array[tag_array_set][way].nrr = 0;
-                tag_array[tag_array_set][way].forward_backward_pointer->nru = 0;
+                // tag_array[tag_array_set][way].forward_backward_pointer->nru = 0;
+                update_reuse_cache_data_replacement_state(tag_array[tag_array_set][way].forward_backward_pointer, data_array_set, RQ.entry[index].type, 1);
 
                 if (RQ.entry[index].fill_level < fill_level)
                 {
@@ -183,23 +259,30 @@ void REUSE_CACHE_LLC::handle_read()
                         upper_level_dcache[read_cpu]->return_data(&RQ.entry[index]);
                     }
                 }
+                sim_llc_access[read_cpu][RQ.entry[index].type]++;
+                sim_llc_tag_hit_data_hit[read_cpu][RQ.entry[index].type]++;
+                // sim_llc_data_hit[read_cpu][RQ.entry[index].type]++;
 
+                // ACCESS[RQ.entry[index].type]++;
+                // HIT[RQ.entry[index].type]++;
+                tag_array[tag_array_set][way].forward_backward_pointer->num_uses++;
+
+                
+                    // if (warmup_complete[read_cpu])
+                    // {cout << "i=" << i << endl;
+                    // cout << "Handle read accesses: " << sim_llc_access[read_cpu][RQ.entry[RQ.head].type] << endl;
+                    // cout << "Handle read misses: " << sim_llc_tag_miss_data_miss[read_cpu][RQ.entry[RQ.head].type] << ", " << sim_llc_tag_hit_data_miss[read_cpu][RQ.entry[RQ.head].type] << endl;
+                    // cout << "Handle read hits: " << sim_llc_tag_hit_data_hit[read_cpu][RQ.entry[RQ.head].type] << endl;
+                    // }
                 RQ.remove_queue(&RQ.entry[index]);
                 reads_available_this_cycle--;
-
-                sim_llc_access[read_cpu][RQ.entry[index].type]++;
-                sim_llc_tag_hit[read_cpu][RQ.entry[index].type]++;
-                sim_llc_data_hit[read_cpu][RQ.entry[index].type]++;
-
-                ACCESS[RQ.entry[index].type]++;
-                HIT[RQ.entry[index].type]++;
-                tag_array[tag_array_set][way].forward_backward_pointer->num_uses++;
             }
             else
             {
                 uint8_t miss_handled = 1;
                 int mshr_index = check_nonfifo_queue(&MSHR, &RQ.entry[index], false);
 
+                // wont happen, can comment
                 if (mshr_index == -2)
                 {
                     // this is a data/instruction collision in the MSHR, so we have to wait before we can allocate this miss
@@ -228,7 +311,7 @@ void REUSE_CACHE_LLC::handle_read()
                         STALL[RQ.entry[index].type]++;
                         miss_handled = 0;
                     }
-                    else if (mshr_index == -1)
+                    else if (mshr_index != -1)
                     {
                         if (RQ.entry[index].type == RFO)
                         {
@@ -319,14 +402,16 @@ void REUSE_CACHE_LLC::handle_read()
                 if (miss_handled)
                 {
                     // sim_llc_access[read_cpu][RQ.entry[index].type]++;
-                    if (tag_way != NUM_TAG_ARRAY_WAYS)
-                    {
-                        // sim_llc_tag_hit[read_cpu][RQ.entry[index].type]++;
-                        sim_llc_data_miss[read_cpu][RQ.entry[index].type]++;
-                    }
+                    // if (tag_way != NUM_TAG_ARRAY_WAYS)
+                    // {
+                    //     // sim_llc_tag_hit[read_cpu][RQ.entry[index].type]++;
+                    //     sim_llc_data_miss[read_cpu][RQ.entry[index].type]++;
+                    // }
+                    // misses are calculated in handle_fill only when mshrs are handled
                     // else
                     //     sim_llc_tag_miss[read_cpu][RQ.entry[index].type]++;
-                    RQ.remove_queue(&RQ.entry[index]);
+
+                    RQ.remove_queue(&RQ.entry[index]);      // removing as request is either added to mshr or merged
                     reads_available_this_cycle--;
                 }
             }
@@ -341,38 +426,109 @@ void REUSE_CACHE_LLC::handle_read()
 
 void REUSE_CACHE_LLC::reuse_cache_llc_replacement_final_stats()
 {
-    std::cout << "REUSE CACHE LLC REPLACEMENT FINAL STATS" << std::endl;
+    std::cout << "REUSE CACHE LLC FINAL STATS" << std::endl;
 
     for (uint32_t i = 0; i < NUM_CPUS; i++)
     {
         std::cout << "CPU: " << i << std::endl;
-        int TOTAL_ACCESS = 0, TOTAL_TAG_MISS = 0, TOTAL_TAG_HIT = 0, TOTAL_DATA_MISS = 0, TOTAL_DATA_HIT = 0;
-        int TOTAL_MISS = 0, TOTAL_HIT = 0;
+        uint64_t TOTAL_ACCESS = 0, TAG_MISS_DATA_MISS = 0, 
+                 TAG_HIT_DATA_MISS = 0, TAG_HIT_DATA_HIT = 0;
+        uint64_t DEMAND_ACCESS = 0, DEMAND_TAG_MISS_DATA_MISS = 0,
+                 DEMAND_TAG_HIT_DATA_MISS = 0, DEMAND_TAG_HIT_DATA_HIT = 0;
+
         for (uint32_t j = 0; j < NUM_TYPES; j++)
         {
-            TOTAL_ACCESS += ACCESS[j];
-            TOTAL_MISS += MISS[j];
-            TOTAL_HIT += HIT[j];
-            TOTAL_TAG_MISS += sim_llc_tag_miss[i][j];
-            TOTAL_TAG_HIT += sim_llc_tag_hit[i][j];
-            TOTAL_DATA_MISS += sim_llc_data_miss[i][j];
-            TOTAL_DATA_HIT += sim_llc_data_hit[i][j];
+            TOTAL_ACCESS        += sim_llc_access[i][j];
+            TAG_MISS_DATA_MISS  += sim_llc_tag_miss_data_miss[i][j];
+            TAG_HIT_DATA_MISS   += sim_llc_tag_hit_data_miss[i][j];
+            TAG_HIT_DATA_HIT    += sim_llc_tag_hit_data_hit[i][j];
         }
-        std::cout << "TOTAL ACCESS: " << TOTAL_ACCESS << " TOTAL MISS: " << TOTAL_MISS << " TOTAL HIT: " << TOTAL_HIT << std::endl;
-        std::cout << "TAG MISS: " << TOTAL_TAG_MISS << " TAG HIT: " << TOTAL_TAG_HIT << std::endl;
-        std::cout << "DATA MISS: " << TOTAL_DATA_MISS << " DATA HIT: " << TOTAL_DATA_HIT << std::endl;
-        std::cout << "TAG_HIT: " << TOTAL_TAG_HIT << " DATA_HIT: " << TOTAL_DATA_HIT << std::endl;
-        std::cout << "MISS_RATE: " << (double)TOTAL_MISS / TOTAL_ACCESS << std::endl;
-        std::cout << "HIT_RATE: " << (double)TOTAL_HIT / TOTAL_ACCESS << std::endl;
 
-        std::cout << "In Reuse Cache:" << std::endl;
-        int totalLines = 0;
+        // load + rfo
+        for (uint32_t j = 0; j <= 1; j++)
+        {
+            DEMAND_ACCESS        += sim_llc_access[i][j];
+            DEMAND_TAG_MISS_DATA_MISS  += sim_llc_tag_miss_data_miss[i][j];
+            DEMAND_TAG_HIT_DATA_MISS   += sim_llc_tag_hit_data_miss[i][j];
+            DEMAND_TAG_HIT_DATA_HIT    += sim_llc_tag_hit_data_hit[i][j];
+        }
+
+        uint64_t TOTAL_MISS   = TAG_MISS_DATA_MISS + TAG_HIT_DATA_MISS;
+        uint64_t TOTAL_HIT    = TAG_HIT_DATA_HIT;
+        uint64_t DEMAND_MISS  = DEMAND_TAG_MISS_DATA_MISS + DEMAND_TAG_HIT_DATA_MISS;
+        uint64_t DEMAND_HIT   = DEMAND_TAG_HIT_DATA_HIT;
+
+        uint64_t num_instrs = ooo_cpu[i].finish_sim_instr;
+
+        if (TOTAL_ACCESS != 0)
+        {
+            cout << NAME;
+            cout << " TOTAL     ACCESS: " << setw(10) << TOTAL_ACCESS << "  HIT: " << setw(10) << TOTAL_HIT << "  MISS: " << setw(10) << TOTAL_MISS << "  HIT %: " << setw(10) << ((double)TOTAL_HIT * 100 / TOTAL_ACCESS) << "  MISS %: " << setw(10) << ((double)TOTAL_MISS * 100 / TOTAL_ACCESS) << "   MPKI: " << ((double)TOTAL_MISS * 1000 / num_instrs) << endl;
+        }
+
+        if (DEMAND_ACCESS != 0)
+        {
+            cout << NAME;
+            cout << " DEMAND     ACCESS: " << setw(10) << DEMAND_ACCESS << "  HIT: " << setw(10) << DEMAND_HIT << "  MISS: " << setw(10) << DEMAND_MISS << "  HIT %: " << setw(10) << ((double)DEMAND_HIT * 100 / DEMAND_ACCESS) << "  MISS %: " << setw(10) << ((double)DEMAND_MISS * 100 / DEMAND_ACCESS) << "   MPKI: " << ((double)DEMAND_MISS * 1000 / num_instrs) << endl;
+        }
+
+        if (sim_llc_access[cpu][3] > 0)
+        {
+            uint64_t WB_MISS = sim_llc_tag_miss_data_miss[cpu][3] + sim_llc_tag_hit_data_miss[cpu][3];
+            uint64_t WB_HIT  = sim_llc_tag_hit_data_hit[cpu][3];
+            cout << NAME << " WRITEBACK ACCESS: " << setw(10) << sim_llc_access[cpu][3] << "  HIT: "    << setw(10) << WB_HIT << "  MISS: "   << setw(10) << WB_MISS << "  HIT %: "  << setw(10) << (sim_llc_access[cpu][3] ? (double)WB_HIT * 100 / sim_llc_access[cpu][3] : 0) << "  MISS %: " << setw(10) << (sim_llc_access[cpu][3] ? (double)WB_MISS * 100 / sim_llc_access[cpu][3] : 0) << "  MPKI: "   << (num_instrs ? (double)WB_MISS * 1000 / num_instrs : 0) << endl;
+        }
+
+        if (sim_llc_access[cpu][4] > 0)
+        {
+            uint64_t LT_MISS = sim_llc_tag_miss_data_miss[cpu][4] + sim_llc_tag_hit_data_miss[cpu][4];
+            uint64_t LT_HIT  = sim_llc_tag_hit_data_hit[cpu][4];
+            cout << NAME << " LOAD TRANSLATION ACCESS: " << setw(10) << sim_llc_access[cpu][4] << "  HIT: "    << setw(10) << LT_HIT << "  MISS: "   << setw(10) << LT_MISS << "  HIT %: "  << setw(10) << (sim_llc_access[cpu][4] ? (double)LT_HIT * 100 / sim_llc_access[cpu][4] : 0) << "  MISS %: " << setw(10) << (sim_llc_access[cpu][4] ? (double)LT_MISS * 100 / sim_llc_access[cpu][4] : 0) << "  MPKI: "   << (num_instrs ? (double)LT_MISS * 1000 / num_instrs : 0) << endl;
+        }
+
+        cout << NAME << " TAG_MISS_DATA_MISS: " << setw(10) << TAG_MISS_DATA_MISS << "  MPKI: " << ((double)TAG_MISS_DATA_MISS * 1000 / num_instrs) << endl;
+        cout << NAME << " TAG_HIT_DATA_MISS: "  << setw(10) << TAG_HIT_DATA_MISS << "  MPKI: " << ((double)TAG_HIT_DATA_MISS * 1000 / num_instrs)  << endl;
+        cout << NAME << " TAG_HIT_DATA_HIT: "   << setw(10) << TAG_HIT_DATA_HIT << "  MPKI: " << ((double)TAG_HIT_DATA_HIT * 1000 / num_instrs) << endl;
+
+
+        if (RQ.ACCESS)
+            cout << NAME << " RQ ACCESS: " << setw(10) << RQ.ACCESS << "	FORWARD: " << setw(10) << RQ.FORWARD << "	MERGED: " << setw(10) << RQ.MERGED << "	TO_CACHE: " << setw(10) << RQ.TO_CACHE << endl;
+
+        if (WQ.ACCESS)
+            cout << NAME << " WQ ACCESS: " << setw(10) << WQ.ACCESS << "	FORWARD: " << setw(10) << WQ.FORWARD << "	MERGED: " << setw(10) << WQ.MERGED << "	TO_CACHE: " << setw(10) << WQ.TO_CACHE << endl;
+
+        if (PQ.ACCESS)
+            cout << NAME << " PQ ACCESS: " << setw(10) << PQ.ACCESS << "	FORWARD: " << setw(10) << PQ.FORWARD << "	MERGED: " << setw(10) << PQ.MERGED << "	TO_CACHE: " << setw(10) << PQ.TO_CACHE << endl;
+
+        cout << endl;
+
+        cout << " AVERAGE MISS LATENCY: (DEMAND MISSES ONLY)" << (1.0 * (total_miss_latency)) / DEMAND_MISS << " cycles" << endl;
+
+        cout << "LLC_EVICTED_BLOCKS_NUM_USES_START" << endl;
+        int evicted_total = 0;
         for (auto &use : num_uses_before_eviction)
         {
-            totalLines += use.second;
-            std::cout << use.second << " lines used " << use.first << " times before eviction" << std::endl;
+            cout << "LLC_EVICTED num_uses: " << use.first << " count: " << use.second << endl;
+            evicted_total += use.second;
         }
-        std::cout << "Total lines: " << totalLines << std::endl;
+        cout << "LLC_EVICTED_TOTAL: " << evicted_total << endl;
+        cout << "LLC_EVICTED_BLOCKS_NUM_USES_END" << endl;
+
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_START" << endl;
+        map<uint32_t, uint32_t> resident_uses;
+        for(int i = 0; i < NUM_DATA_ARRAY_SETS; i++)
+            for(int j = 0; j < NUM_DATA_ARRAY_WAYS; j++)
+                if(data_array[i][j].valid == 1)
+                    resident_uses[data_array[i][j].num_uses]++;
+
+        int resident_total = 0;
+        for (auto &use : resident_uses)
+        {
+            cout << "LLC_RESIDENT num_uses: " << use.first << " count: " << use.second << endl;
+            resident_total += use.second;
+        }
+        cout << "LLC_RESIDENT_TOTAL: " << resident_total << endl;
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_END" << endl;
     }
 }
 
@@ -413,19 +569,31 @@ int REUSE_CACHE_LLC::check_hit(PACKET *packet)
 
 int REUSE_CACHE_LLC::invalidate_entry(uint64_t inval_addr)
 {
-    uint32_t set = get_set(inval_addr);
+    uint32_t tag_array_set = get_set(inval_addr);
+    int match_way = -1;
 
-    for (uint32_t i = 0; i < NUM_TAG_ARRAY_WAYS; i++)
+    for (uint32_t way = 0; way < NUM_TAG_ARRAY_WAYS; way++)
     {
-        if (tag_array[set][i].valid && tag_array[set][i].tag == inval_addr)
+        if (tag_array[tag_array_set][way].valid &&
+            tag_array[tag_array_set][way].tag == inval_addr)
         {
-            tag_array[set][i].valid = 0;
-            tag_array[set][i].hasData = false;
-            return 1;
+            if (tag_array[tag_array_set][way].hasData)
+            {
+                tag_array[tag_array_set][way].forward_backward_pointer->valid = 0;
+                tag_array[tag_array_set][way].forward_backward_pointer->dirty = 0;
+                tag_array[tag_array_set][way].forward_backward_pointer->forward_backward_pointer = nullptr;
+            }
+
+            tag_array[tag_array_set][way].valid = 0;
+            tag_array[tag_array_set][way].hasData = false;
+            tag_array[tag_array_set][way].forward_backward_pointer = nullptr;
+
+            match_way = way;
+            break;
         }
     }
 
-    return 0;
+    return match_way;
 }
 
 int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
@@ -454,16 +622,20 @@ int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
                     writeback_packet.address = tag_array[tag_array_set][tag_victim].address;
                     writeback_packet.full_addr = tag_array[tag_array_set][tag_victim].full_addr;
                     writeback_packet.data = tag_array[tag_array_set][tag_victim].data;
-                    writeback_packet.instr_id = packet->instr_id;
+                    writeback_packet.instr_id = 0;
                     writeback_packet.ip = 0; // writeback does not have ip
                     writeback_packet.type = WRITEBACK;
                     writeback_packet.event_cycle = current_core_cycle[packet->cpu];
+                    memcpy(writeback_packet.data_value, tag_array[tag_array_set][tag_victim].forward_backward_pointer->data_value, BLOCK_SIZE);
+                    writeback_packet.data_size = BLOCK_SIZE;
+                    writeback_packet.block_offset = 0;
 
                     lower_level->add_wq(&writeback_packet);
                 }
             }
         }
 
+        num_uses_before_eviction[tag_array[tag_array_set][tag_victim].forward_backward_pointer->num_uses]++;
         tag_array[tag_array_set][tag_victim].forward_backward_pointer->valid = 0;
     }
 
@@ -476,7 +648,7 @@ int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
     tag_array[tag_array_set][tag_victim].address = packet->address;
     tag_array[tag_array_set][tag_victim].full_addr = packet->full_addr;
     tag_array[tag_array_set][tag_victim].cpu = packet->cpu;
-    tag_array[tag_array_set][tag_victim].instr_id = packet->instr_id;
+    tag_array[tag_array_set][tag_victim].instr_id = packet->instr_id;   // todo:: why does blocks need instr_id? verify mostly no need
 
     tag_array[tag_array_set][tag_victim].delta = packet->delta;
     tag_array[tag_array_set][tag_victim].depth = packet->depth;
@@ -485,13 +657,14 @@ int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
 
     tag_array[tag_array_set][tag_victim].hasData = false;
     tag_array[tag_array_set][tag_victim].nrr = 1;
+    tag_array[tag_array_set][tag_victim].forward_backward_pointer = nullptr;
 
     return 1;
 }
 
 int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_way, PACKET *packet)
 {
-    uint32_t data_array_set = (uint32_t)(tag_array_set & ((1 << lg2(NUM_DATA_ARRAY_SETS)) - 1));
+    uint32_t data_array_set = get_data_array_set(tag_array_set);
     uint32_t data_array_way = reuse_cache_llc_find_data_array_victim(data_array_set);
 
     if (data_array[data_array_set][data_array_way].valid && data_array[data_array_set][data_array_way].dirty)
@@ -514,17 +687,24 @@ int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_
                 writeback_packet.address = data_array[data_array_set][data_array_way].address;
                 writeback_packet.full_addr = data_array[data_array_set][data_array_way].full_addr;
                 writeback_packet.data = data_array[data_array_set][data_array_way].data;
-                writeback_packet.instr_id = packet->instr_id;
+                writeback_packet.instr_id = 0;
                 writeback_packet.ip = 0; // writeback does not have ip
                 writeback_packet.type = WRITEBACK;
                 writeback_packet.event_cycle = current_core_cycle[packet->cpu];
+                memcpy(writeback_packet.data_value, data_array[data_array_set][data_array_way].data_value, BLOCK_SIZE);
+                writeback_packet.data_size = BLOCK_SIZE;
+                writeback_packet.block_offset = 0;
 
                 lower_level->add_wq(&writeback_packet);
-
-                data_array[data_array_set][data_array_way].valid = 0;
-                data_array[data_array_set][data_array_way].forward_backward_pointer->valid = 0;
             }
         }
+    }
+
+    if(data_array[data_array_set][data_array_way].valid)
+    {
+        num_uses_before_eviction[data_array[data_array_set][data_array_way].num_uses]++;
+        data_array[data_array_set][data_array_way].forward_backward_pointer->hasData = false;
+        data_array[data_array_set][data_array_way].valid = 0;
     }
 
     data_array[data_array_set][data_array_way].valid = 1;
@@ -544,12 +724,15 @@ int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_
     data_array[data_array_set][data_array_way].signature = packet->signature;
     data_array[data_array_set][data_array_way].confidence = packet->confidence;
 
+    // TODO:: we need to do memset for cacheline with 0? as we dont have which bitsare valid?
+    memcpy(data_array[data_array_set][data_array_way].data_value + packet->block_offset, packet->data_value, packet->data_size);
+
     tag_array[tag_array_set][tag_array_way].hasData = 1;
     tag_array[tag_array_set][tag_array_way].forward_backward_pointer = &data_array[data_array_set][data_array_way];
     data_array[data_array_set][data_array_way].forward_backward_pointer = &tag_array[tag_array_set][tag_array_way];
 
-    tag_array[tag_array_set][tag_array_way].nrr = 0;
-    data_array[data_array_set][data_array_way].nru = 1;
+    tag_array[tag_array_set][tag_array_way].nrr = 0;    // data exists only when tag hits i.e. recently reused
+    // data_array[data_array_set][data_array_way].nru = 1;
     data_array[data_array_set][data_array_way].num_uses = 0;
 
     return 1;
@@ -557,21 +740,32 @@ int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_
 
 uint32_t REUSE_CACHE_LLC::reuse_cache_llc_find_tag_array_victim(uint32_t tag_array_set)
 {
+    uint8_t start = rr_ptr_tag_array[tag_array_set];
+
     for (int i = 0; i < NUM_TAG_ARRAY_WAYS; i++)
     {
-        if (tag_array[tag_array_set][i].valid == 0)
+        int way = (start + i) % NUM_TAG_ARRAY_WAYS;
+
+        if (tag_array[tag_array_set][way].valid == 0)
         {
-            return i;
+            rr_ptr_tag_array[tag_array_set] = (way + 1) % NUM_TAG_ARRAY_WAYS;
+            return way;
         }
     }
 
     for (int i = 0; i < NUM_TAG_ARRAY_WAYS; i++)
     {
-        if (tag_array[tag_array_set][i].nrr == 1)
+        int way = (start + i) % NUM_TAG_ARRAY_WAYS;
+        if (tag_array[tag_array_set][way].nrr == 1)
         {
-            return i;
+            rr_ptr_tag_array[tag_array_set] = (way + 1) % NUM_TAG_ARRAY_WAYS;
+            return way;
         }
     }
+
+    // // todo:: will there be a case where nrr be not 1 for all entries and valid? i dont think so... 
+    rr_ptr_tag_array[tag_array_set] = (start + 1) % NUM_TAG_ARRAY_WAYS;
+    return start;
 }
 
 uint32_t REUSE_CACHE_LLC::reuse_cache_llc_find_data_array_victim(uint32_t data_array_set)
@@ -586,10 +780,33 @@ uint32_t REUSE_CACHE_LLC::reuse_cache_llc_find_data_array_victim(uint32_t data_a
 
     for (int i = 0; i < NUM_DATA_ARRAY_WAYS; i++)
     {
-        if (data_array[data_array_set][i].nru == 1)
+        if (data_array[data_array_set][i].lru == NUM_DATA_ARRAY_WAYS - 1)
         {
-            num_uses_before_eviction[data_array[data_array_set][i].num_uses]++;
             return i;
         }
     }
+}
+
+
+void REUSE_CACHE_LLC::update_reuse_cache_data_replacement_state(BLOCK* data_block, uint32_t data_array_set, uint32_t type, uint8_t hit)
+{
+    if(hit && (type == WRITEBACK))
+    {
+        return;
+    }
+
+    for (uint32_t i = 0; i < NUM_DATA_ARRAY_WAYS; i++)
+    {
+        if (data_array[data_array_set][i].lru < data_block->lru)
+        {
+            data_array[data_array_set][i].lru++;        // while evicting check valid of block not just lru
+        }
+    }
+    data_block->lru = 0; // promote to the MRU position
+}
+
+uint32_t REUSE_CACHE_LLC::get_data_array_set(uint32_t tag_array_set)
+{
+    uint32_t data_array_set = (uint32_t)(tag_array_set & ((1 << lg2(NUM_DATA_ARRAY_SETS)) - 1));
+    return data_array_set;
 }
