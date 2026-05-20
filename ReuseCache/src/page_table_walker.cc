@@ -106,7 +106,7 @@ void PAGE_TABLE_WALKER::operate()
                 else
                     MSHR.entry[index].event_cycle = current_core_cycle[cpu];
 
-                MSHR.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (MSHR.entry[index].full_virtual_address && ((1 << LOG2_PAGE_SIZE) - 1)); // Return the translated physical address to STLB
+                MSHR.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (MSHR.entry[index].full_virtual_address & ((1 << LOG2_PAGE_SIZE) - 1)); // Return the translated physical address to STLB
 
                 if (knob_cloudsuite)
                 {
@@ -247,7 +247,7 @@ void PAGE_TABLE_WALKER::operate()
                     next_level_base_addr = curr_page->next_level_base_addr[offset];
 
                     RQ.entry[index].event_cycle = current_core_cycle[cpu] + PAGE_TABLE_LATENCY;
-                    RQ.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (RQ.entry[index].full_virtual_address && ((1 << LOG2_PAGE_SIZE) - 1));
+                    RQ.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (RQ.entry[index].full_virtual_address & ((1 << LOG2_PAGE_SIZE) - 1));
 
                     if (RQ.entry[index].instruction)
                         upper_level_icache[cpu]->return_data(&RQ.entry[index]);
@@ -319,7 +319,8 @@ void PAGE_TABLE_WALKER::operate()
             }
             else if (address_pscl5 != UINT64_MAX)
             {
-                next_address = address_pscl5 << LOG2_PAGE_SIZE | (get_offset(RQ.entry[index].full_addr, IS_PTL4) << 3);
+                // next_address = address_pscl5 << LOG2_PAGE_SIZE | (get_offset(RQ.entry[index].full_addr, IS_PTL4) << 3);
+                next_address = address_pscl5 << LOG2_PAGE_SIZE | (get_offset(PQ.entry[index].full_addr, IS_PTL4) << 3);
                 packet.translation_level = 4;
             }
             else
@@ -360,7 +361,7 @@ void PAGE_TABLE_WALKER::operate()
                     uint64_t offset = get_offset(PQ.entry[index].full_virtual_address, IS_PTL1);
                     next_level_base_addr = curr_page->next_level_base_addr[offset];
                     PQ.entry[index].event_cycle = current_core_cycle[cpu] + PAGE_TABLE_LATENCY;
-                    PQ.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (RQ.entry[index].full_virtual_address && ((1 << LOG2_PAGE_SIZE) - 1));
+                    PQ.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (RQ.entry[index].full_virtual_address & ((1 << LOG2_PAGE_SIZE) - 1));
 
                     if (PQ.entry[index].instruction)
                         upper_level_icache[cpu]->return_data(&PQ.entry[index]);

@@ -6,9 +6,9 @@
 #include <map>
 
 // REUSE CACHE PARAMETERS
-#define REUSE_CACHE_TAG_ARRAY_SET 4096
+#define REUSE_CACHE_TAG_ARRAY_SET 16384
 #define REUSE_CACHE_TAG_ARRAY_WAYS 16
-#define REUSE_CACHE_DATA_ARRAY_SET 1024
+#define REUSE_CACHE_DATA_ARRAY_SET 8192
 #define REUSE_CACHE_DATA_ARRAY_WAYS 16
 
 class REUSE_CACHE_LLC : public CACHE
@@ -18,13 +18,12 @@ public:
     BLOCK **tag_array;
     BLOCK **data_array;
     uint8_t *rr_ptr_tag_array;    // round-robin like ptr for NRR replacement for each set
-    uint8_t *rr_ptr_data_array;     // round-robin like ptr for NRU replacement
 
     uint64_t sim_llc_access[NUM_CPUS][NUM_TYPES],
-        sim_llc_tag_miss[NUM_CPUS][NUM_TYPES],
-        sim_llc_tag_hit[NUM_CPUS][NUM_TYPES],
-        sim_llc_data_miss[NUM_CPUS][NUM_TYPES],  // VERIFY: calculating data misses when tag is hit but data isnt found in data array.. (Tag misses shows data misses also since tag_miss means no data) So combination of this and tag_miss may be equal to MISS[]
-        sim_llc_data_hit[NUM_CPUS][NUM_TYPES];
+        sim_llc_tag_miss_data_miss[NUM_CPUS][NUM_TYPES],      // tag miss(so no data)
+        sim_llc_tag_hit_data_miss[NUM_CPUS][NUM_TYPES],       // only tag hit and data miss
+        // sim_llc_data_miss[NUM_CPUS][NUM_TYPES],     
+        sim_llc_tag_hit_data_hit[NUM_CPUS][NUM_TYPES];      // tag hit and has data
 
     map<uint64_t, uint32_t> num_uses_before_eviction;
 
@@ -33,18 +32,27 @@ public:
     {
         tag_array = new BLOCK *[NUM_TAG_ARRAY_SETS];
         rr_ptr_tag_array = new uint8_t[NUM_TAG_ARRAY_SETS];
+
         for (uint32_t i = 0; i < NUM_TAG_ARRAY_SETS; i++)
         {
             tag_array[i] = new BLOCK[NUM_TAG_ARRAY_WAYS];
             rr_ptr_tag_array[i] = 0;
+            
+            // for (uint32_t j = 0; j < NUM_TAG_ARRAY_WAYS; j++)
+            // {
+            //     tag_array[i][j].lru = j;
+            // }
         }
 
         data_array = new BLOCK *[NUM_DATA_ARRAY_SETS];
-        rr_ptr_data_array = new uint8_t[NUM_DATA_ARRAY_SETS];
         for (uint32_t i = 0; i < NUM_DATA_ARRAY_SETS; i++)
         {
             data_array[i] = new BLOCK[NUM_DATA_ARRAY_WAYS];
-            rr_ptr_data_array[i] = 0;
+
+            for (uint32_t j = 0; j < NUM_DATA_ARRAY_WAYS; j++)
+            {
+                data_array[i][j].lru = j;
+            }
         }
 
         for (uint32_t i = 0; i < NUM_CPUS; i++)
@@ -52,10 +60,10 @@ public:
             for (uint32_t j = 0; j < NUM_TYPES; j++)
             {
                 sim_llc_access[i][j] = 0;
-                sim_llc_tag_miss[i][j] = 0;
-                sim_llc_tag_hit[i][j] = 0;
-                sim_llc_data_miss[i][j] = 0;
-                sim_llc_data_hit[i][j] = 0;
+                sim_llc_tag_miss_data_miss[i][j] = 0;
+                sim_llc_tag_hit_data_miss[i][j] = 0;
+                // sim_llc_data_miss[i][j] = 0;
+                sim_llc_tag_hit_data_hit[i][j] = 0;
             }
         }
 
@@ -72,7 +80,6 @@ public:
 
     int fill_cache_tag(uint32_t tag_array_set, PACKET *packet);
     int fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_way, PACKET *packet);
-    int fill_cache_tag_data(uint32_t tag_array_set, PACKET *packet);  // In writeback case...
     int check_tag_hit(PACKET *packet);
     int check_hit(PACKET *packet);
     int invalidate_entry(uint64_t inval_addr);
@@ -80,12 +87,15 @@ public:
     void handle_fill();
     void handle_writeback();
     void handle_read();
-    void handle_prefetch();
 
     void reuse_cache_llc_replacement_final_stats();
 
-    uint32_t reuse_cache_llc_find_tag_array_victim(uint32_t tag_array_set, bool find_to_replace = true),
-        reuse_cache_llc_find_data_array_victim(uint32_t data_array_set, bool find_to_replace = true);
+    uint32_t reuse_cache_llc_find_tag_array_victim(uint32_t tag_array_set),
+        reuse_cache_llc_find_data_array_victim(uint32_t data_array_set);
+    
+
+    void update_reuse_cache_data_replacement_state(BLOCK* data_block, uint32_t data_array_set, uint32_t type, uint8_t hit);
+    uint32_t get_data_array_set(uint32_t tag_array_set);
 };
 
 #endif

@@ -20,7 +20,7 @@ using namespace std;
 #define EXEC_WIDTH 6
 #define LQ_WIDTH 2
 #define SQ_WIDTH 2
-#define RETIRE_WIDTH 4
+#define RETIRE_WIDTH 5
 #define SCHEDULER_SIZE 128
 #define BRANCH_MISPREDICT_PENALTY 1 //@Vishal: Updated from 20 to be same as new ChampSim, anyway penalty is simulated because of queues
 // #define SCHEDULING_LATENCY 6
