@@ -258,6 +258,8 @@ void O3_CPU::read_from_trace()
                 if (instr_unique_id == 0)
                 {
                     current_instr = next_instr = trace_read_instr;
+                    instr_unique_id++;
+                    continue;
                 }
                 else
                 {
@@ -1163,7 +1165,7 @@ void O3_CPU::schedule_instruction()
         return;
 
     // execution is out-of-order but we have an in-order scheduling algorithm to detect all RAW dependencies
-    uint32_t limit = ROB.next_fetch[1];
+    uint32_t limit = ROB.tail;
     ////DP ( if (warmup_complete[cpu]) {	//*******************************************************************************************
     //          //cout << "Entered schedule_instruction() with instr id:"<< ROB.entry[limit].instr_id << endl; });
     num_searched = 0;
@@ -1975,11 +1977,12 @@ void O3_CPU::operate_lsq()
 
     //@Vishal: VIPT. Send request to L1D.
 
+    uint32_t idx = RTL0_head;
     while (load_issued < LQ_WIDTH)
     {
-        if (RTL0[RTL0_head] < LQ_SIZE)
+        if (RTL0[idx] < LQ_SIZE)
         {
-            uint32_t lq_index = RTL0[RTL0_head];
+            uint32_t lq_index = RTL0[idx];
             if (LQ.entry[lq_index].event_cycle <= current_core_cycle[cpu])
             {
 
@@ -1987,26 +1990,23 @@ void O3_CPU::operate_lsq()
 
                 if (rq_index != -2)
                 {
-                    RTL0[RTL0_head] = LQ_SIZE;
-                    RTL0_head++;
-                    if (RTL0_head == LQ_SIZE)
-                        RTL0_head = 0;
-
+                    RTL0[idx] = LQ_SIZE;
                     load_issued++;
                 }
             }
         }
-        else
-        {
-            ////DP (if (warmup_complete[cpu]) {
-            ////cout << "[RTL1] is empty head: " << RTL1_head << " tail: " << RTL1_tail << endl; });
-            break;
-        }
-
+        // else
+        // {
+        //     ////DP (if (warmup_complete[cpu]) {
+        //     ////cout << "[RTL1] is empty head: " << RTL1_head << " tail: " << RTL1_tail << endl; });
+        //     break;
+        // }
+        idx = (idx + 1) % LQ_SIZE;
         num_iteration++;
-        if (num_iteration == (LQ_SIZE - 1))
+        if (num_iteration == (LQ_SIZE)) 
             break;
     }
+    RTL0_head = idx;
 
     /*while (load_issued < LQ_WIDTH) {
         if (RTL0[RTL0_head] < LQ_SIZE) {
@@ -2168,9 +2168,9 @@ void O3_CPU::execute_store(uint32_t rob_index, uint32_t sq_index, uint32_t data_
 
                         release_load_queue(lq_index);
 
-                        // clear dependency bit
-                        if (j == (NUM_INSTR_SOURCES - 1))
-                            ROB.entry[rob_index].memory_instrs_depend_on_me.insert(dependent);
+                        // // clear dependency bit
+                        // if (j == (NUM_INSTR_SOURCES - 1))
+                        //     ROB.entry[rob_index].memory_instrs_depend_on_me.insert(dependent);
                     }
                 }
             }

@@ -68,7 +68,7 @@ void CACHE::handle_fill()
                 fill_packet_type = 3;
         }
 
-#ifdef L2_BYPASShandle_w
+#ifdef L2_BYPASS
 
         // Knob for bypassing only instructions or only data or both - L2C_BYPASS_MODE
 
@@ -811,13 +811,15 @@ void CACHE::handle_writeback()
 
             // mark dirty
             block[set][way].dirty = 1;
+            if(WQ.entry[index].type != WRITEBACK) block[set][way].num_uses++;
 
             if (cache_type == IS_ITLB)
                 WQ.entry[index].instruction_pa = block[set][way].data;
             else if (cache_type == IS_DTLB)
                 WQ.entry[index].data_pa = block[set][way].data;
 
-            WQ.entry[index].data = block[set][way].data;
+            block[set][way].data = WQ.entry[index].data;
+            // WQ.entry[index].data = block[set][way].data;
 
             // check fill level
             if (WQ.entry[index].fill_level < fill_level)
@@ -2920,12 +2922,14 @@ void CACHE::fill_cache(uint32_t set, uint32_t way, PACKET *packet)
 #endif
     if (block[set][way].prefetch && (block[set][way].used == 0))
         pf_useless++;
-
+    if(block[set][way].valid)
+        num_uses_before_eviction[block[set][way].num_uses]++;
     if (block[set][way].valid == 0)
         block[set][way].valid = 1;
     block[set][way].dirty = 0;
     block[set][way].prefetch = (packet->type == PREFETCH || packet->type == PREFETCH_TRANSLATION || packet->type == TRANSLATION_FROM_L1D) ? 1 : 0;
     block[set][way].used = 0;
+    block[set][way].num_uses = 0;
 
     // Neelu: Setting instruction and translation fields in L2C
     if (cache_type == IS_L2C)

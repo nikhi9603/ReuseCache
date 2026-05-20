@@ -154,6 +154,7 @@ void print_energy_profile()
 void print_roi_stats(uint32_t cpu, CACHE *cache)
 {
     uint64_t TOTAL_ACCESS = 0, TOTAL_HIT = 0, TOTAL_MISS = 0, TOTAL_INSTR_MISS = 0;
+    uint64_t DEMAND_ACCESS = 0, DEMAND_HIT = 0, DEMAND_MISS = 0;
 
     for (uint32_t i = 0; i < NUM_TYPES; i++)
     {
@@ -163,12 +164,22 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         TOTAL_INSTR_MISS += cache->roi_instr_miss[cpu][i];
     }
 
+    DEMAND_ACCESS = cache->roi_access[cpu][LOAD] + cache->roi_access[cpu][RFO];
+    DEMAND_HIT = cache->roi_hit[cpu][LOAD] + cache->roi_hit[cpu][RFO];
+    DEMAND_MISS = cache->roi_miss[cpu][LOAD] + cache->roi_miss[cpu][RFO];
+
     uint64_t num_instrs = ooo_cpu[cpu].finish_sim_instr;
 
     if (TOTAL_ACCESS != 0)
     {
         cout << cache->NAME;
         cout << " TOTAL     ACCESS: " << setw(10) << TOTAL_ACCESS << "  HIT: " << setw(10) << TOTAL_HIT << "  MISS: " << setw(10) << TOTAL_MISS << "  HIT %: " << setw(10) << ((double)TOTAL_HIT * 100 / TOTAL_ACCESS) << "  MISS %: " << setw(10) << ((double)TOTAL_MISS * 100 / TOTAL_ACCESS) << "   MPKI: " << ((double)TOTAL_MISS * 1000 / num_instrs) << endl;
+    }
+
+    if (DEMAND_ACCESS != 0)
+    {
+        cout << cache->NAME;
+        cout << " DEMAND     ACCESS: " << setw(10) << DEMAND_ACCESS << "  HIT: " << setw(10) << DEMAND_HIT << "  MISS: " << setw(10) << DEMAND_MISS << "  HIT %: " << setw(10) << ((double)DEMAND_HIT * 100 / DEMAND_ACCESS) << "  MISS %: " << setw(10) << ((double)DEMAND_MISS * 100 / DEMAND_ACCESS) << "   MPKI: " << ((double)DEMAND_MISS * 1000 / num_instrs) << endl;
     }
 
     if (cache->cache_type == IS_BTB)
@@ -260,7 +271,8 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
     else
     {
         cout << cache->NAME;
-        cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
+        // cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
+        cout << " AVERAGE MISS LATENCY: (DEMAND MISSES ONLY)" << (1.0 * (cache->total_miss_latency)) / DEMAND_MISS << " cycles" << endl;
     }
 
     //@Vishal: Will work only for 1 core, for multi-core this will give sim_result not roi_result
@@ -317,25 +329,31 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
         // iterate over num_uses_before_eviction map"
         cout << endl;
 
-        for(int i = 0; i < cache->NUM_SET; i++)
-        {
-            for(int j = 0; j < cache->NUM_WAY; j++)
-            {
-                if(cache->block[i][j].valid == 1)
-                {
-                    cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
-                }
-            }
-        }
-
-        cout << "In LLC: " << endl;
-        int totalLines = 0;
+             cout << "LLC_EVICTED_BLOCKS_NUM_USES_START" << endl;
+        int evicted_total = 0;
         for (auto &use : cache->num_uses_before_eviction)
         {
-            if(use.second != 0) {cout << use.second << " lines used " << use.first << " times before eviction" << endl;}
-            totalLines += use.second;
+            cout << "LLC_EVICTED num_uses: " << use.first << " count: " << use.second << endl;
+            evicted_total += use.second;
         }
-        cout << "Total lines: " << totalLines << endl;
+        cout << "LLC_EVICTED_TOTAL: " << evicted_total << endl;
+        cout << "LLC_EVICTED_BLOCKS_NUM_USES_END" << endl;
+
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_START" << endl;
+        map<uint32_t, uint32_t> resident_uses;
+        for(int i = 0; i < cache->NUM_SET; i++)
+            for(int j = 0; j < cache->NUM_WAY; j++)
+                if(cache->block[i][j].valid == 1)
+                    resident_uses[cache->block[i][j].num_uses]++;
+
+        int resident_total = 0;
+        for (auto &use : resident_uses)
+        {
+            cout << "LLC_RESIDENT num_uses: " << use.first << " count: " << use.second << endl;
+            resident_total += use.second;
+        }
+        cout << "LLC_RESIDENT_TOTAL: " << resident_total << endl;
+        cout << "LLC_RESIDENT_BLOCKS_NUM_USES_END" << endl;
     }
     static int flag = 0;
 #ifdef PUSH_DTLB_PB
@@ -495,11 +513,11 @@ void reset_cache_stats(uint32_t cpu, CACHE *cache)
     cache->PQ.FORWARD = 0;
     cache->PQ.FULL = 0;
 
-    for(auto &num_uses: cache->num_uses_before_eviction)
-    {
-        num_uses.second = 0;
-    }
-
+    // for(auto &num_uses: cache->num_uses_before_eviction)
+    // {
+    //     num_uses.second = 0;
+    // }
+    cache->num_uses_before_eviction.clear();
     for(int i = 0; i < cache->NUM_SET; i++)
     {
         for(int j = 0; j < cache->NUM_WAY; j++)
@@ -593,25 +611,25 @@ void print_llc_warmup_stats(uint32_t cpu, CACHE *cache)
             cout << " WARMUP TRANSLATION FROM L1D PREFETCHER ACCESS: " << setw(10) << cache->roi_access[cpu][6] << "  HIT: " << setw(10) << cache->roi_hit[cpu][6] << "  MISS: " << setw(10) << cache->roi_miss[cpu][6] << "  HIT %: " << setw(10) << ((double)cache->roi_hit[cpu][6] * 100 / cache->roi_access[cpu][6]) << "  MISS %: " << setw(10) << ((double)cache->roi_miss[cpu][6] * 100 / cache->roi_access[cpu][6]) << "   MPKI: " << ((double)cache->roi_miss[cpu][6] * 1000 / num_instrs) << endl; //<< " T_ACCESS: " << setw(10) << cache->ACCESS[4] << " T_HIT: " << setw(10) << cache->HIT[4] << " T_MISS: " << setw(10) << cache->MISS[4] <<" T_MSHR_MERGED: " << cache->MSHR_MERGED[4] << endl;
         }
 
-        for(int i = 0; i < cache->NUM_SET; i++)
-        {
-            for(int j = 0; j < cache->NUM_WAY; j++)
-            {
-                if(cache->block[i][j].valid == 1)
-                {
-                    cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
-                }
-            }
-        }
+        // for(int i = 0; i < cache->NUM_SET; i++)
+        // {
+        //     for(int j = 0; j < cache->NUM_WAY; j++)
+        //     {
+        //         if(cache->block[i][j].valid == 1)
+        //         {
+        //             cache->num_uses_before_eviction[cache->block[i][j].num_uses]++;
+        //         }
+        //     }
+        // }
 
-        std::cout << "In Conventional Cache by the end of warmup:" << std::endl;
-        int totalLines = 0;
-        for (auto &use : cache->num_uses_before_eviction)
-        {
-            totalLines += use.second;
-            std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
-        }
-        std::cout << "Total number of lines: " << totalLines << std::endl;
+        // std::cout << "In Conventional Cache by the end of warmup:" << std::endl;
+        // int totalLines = 0;
+        // for (auto &use : cache->num_uses_before_eviction)
+        // {
+        //     totalLines += use.second;
+        //     std::cout << use.second << " lines have been used " << use.first << " times before eviction" << std::endl;
+        // }
+        // std::cout << "Total number of lines: " << totalLines << std::endl;
 
         for (uint32_t i = 0; i < NUM_TYPES; i++)
         {
@@ -632,9 +650,9 @@ void finish_warmup()
     elapsed_second -= (elapsed_hour * 3600 + elapsed_minute * 60);
 
     // reset core latency
-    SCHEDULING_LATENCY = 6;
+    SCHEDULING_LATENCY = 2;
     EXEC_LATENCY = 1;
-    DECODE_LATENCY = 2;
+    DECODE_LATENCY = 1;
     PAGE_TABLE_LATENCY = 100;
     SWAP_LATENCY = 100000;
 
