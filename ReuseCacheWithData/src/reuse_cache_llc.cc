@@ -21,13 +21,20 @@ void REUSE_CACHE_LLC::handle_fill()
         { // tag already present, but data not present
             filled = fill_cache_data(tag_array_set, tag_way, &MSHR.entry[mshr_index]);
             if (filled)
+            {
                 sim_llc_tag_hit_data_miss[fill_cpu][MSHR.entry[mshr_index].type]++;
+                tag_array[tag_array_set][tag_way].nrr = 0;
+                auto data_array_set = get_data_array_set(tag_array_set);
+                update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, MSHR.entry[mshr_index].type, 1);
+            }
         }
         else
         { // tag not present
             filled = fill_cache_tag(tag_array_set, &MSHR.entry[mshr_index]);
             if (filled)
+            {
                 sim_llc_tag_miss_data_miss[fill_cpu][MSHR.entry[mshr_index].type]++;
+            }
         }
 
         if (filled)
@@ -77,8 +84,6 @@ void REUSE_CACHE_LLC::handle_writeback()
     if (writeback_cpu == NUM_CPUS)
         return;
 
-    bool isBypass = false;      // only for writebacks which has no tag
-
     if ((WQ.entry[WQ.head].event_cycle <= current_core_cycle[writeback_cpu]) && (WQ.occupancy > 0))
     {
         uint32_t index = WQ.head;
@@ -95,26 +100,51 @@ void REUSE_CACHE_LLC::handle_writeback()
             {
                 filled = 1;
                 sim_llc_tag_hit_data_hit[writeback_cpu][WQ.entry[index].type]++;
-                update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 1);
+                // update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 1);
+                tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
+                // tag_array[tag_array_set][tag_way].forward_backward_pointer->num_uses++;
+                // TODO:: I need to handle data memcpy here later. (for isdata)
             }
             else // data miss
             {
-                filled = fill_cache_data(tag_array_set, tag_way, &WQ.entry[index]);
+                if (lower_level && WQ.entry[index].type == WRITEBACK)
+                {
+                    if (lower_level->get_occupancy(2, WQ.entry[index].address) == lower_level->get_size(2, WQ.entry[index].address))
+                    {
+                        // lower level WQ is full, cannot replace this victim
+                        lower_level->increment_WQ_FULL(WQ.entry[index].address);
+                        STALL[WQ.entry[index].type]++;
+                        filled = 0;
+                    }
+                    else
+                    {
+                        filled = 1;
+                        PACKET writeback_packet;
+                        writeback_packet = WQ.entry[index];
+
+                        writeback_packet.fill_level = fill_level << 1;
+                        writeback_packet.cpu = WQ.entry[index].cpu;
+                        writeback_packet.address = WQ.entry[index].address;
+                        writeback_packet.full_addr = WQ.entry[index].full_addr;
+                        writeback_packet.data = WQ.entry[index].data;
+                        writeback_packet.instr_id = 0;
+                        writeback_packet.ip = 0; // writeback does not have ip
+                        writeback_packet.type = WRITEBACK;
+                        writeback_packet.event_cycle = current_core_cycle[WQ.entry[index].cpu];
+                        writeback_packet.data_size = WQ.entry[index].data_size;     // anyways data value is not valid.. think of this how to handle as we thought writeback request is of block size
+                        writeback_packet.block_offset = WQ.entry[index].block_offset;
+                //         // writeback_packet.data_value = WQ.entry[index].data_value;        // todo:: data value is array, memcopy it later
+
+                        lower_level->add_wq(&writeback_packet);
+                    }
+                }
+
                 if(filled)
                 {
                     sim_llc_tag_hit_data_miss[writeback_cpu][WQ.entry[index].type]++;
-                    update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 0);
+                    // update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 1);
                 }
             }
-
-            if(filled)
-            {
-                tag_array[tag_array_set][tag_way].forward_backward_pointer->dirty = 1;
-                // TODO:: I need to handle data memcpy here later. (for isdata)
-                // update_reuse_cache_data_replacement_state(tag_array[tag_array_set][tag_way].forward_backward_pointer, data_array_set, WQ.entry[WQ.head].type, 1);
-                tag_array[tag_array_set][tag_way].forward_backward_pointer->num_uses++;
-            }
-
         }
         else // tag miss
         {
@@ -149,70 +179,17 @@ void REUSE_CACHE_LLC::handle_writeback()
                     lower_level->add_wq(&writeback_packet);
                 }
             }
-            else if(lower_level && WQ.entry[index].type == RFO)     // does this happen? RFO requests come to LLC through RQ right? only at L1D wq right?
-            {
-                cout << "This shouldn't happen RFO" << endl;
-                if (lower_level->get_occupancy(2, WQ.entry[index].address) >= lower_level->get_size(2, WQ.entry[index].address) - 1) /// filling tag can have a victim which is dirty and if no space is there again this will be added in next run
-                {
-                    // lower level WQ is full, cannot replace this victim
-                    lower_level->increment_WQ_FULL(WQ.entry[index].address);
-                    STALL[WQ.entry[index].type]++;
-                    filled = 0;
-                }
-                                else
-                {
-                    filled = 1;
-                    PACKET new_packet;
-                    new_packet = WQ.entry[index];
-
-                    new_packet.fill_level = fill_level << 1;
-                    new_packet.cpu = WQ.entry[index].cpu;
-                    new_packet.address = WQ.entry[index].address;
-                    new_packet.full_addr = WQ.entry[index].full_addr;
-                    new_packet.data = WQ.entry[index].data;
-                    new_packet.instr_id = 0;
-                    new_packet.ip = 0; // writeback does not have ip
-                    new_packet.type = RFO;
-                    new_packet.event_cycle = current_core_cycle[WQ.entry[index].cpu];
-                    new_packet.data_size = WQ.entry[index].data_size;     // anyways data value is not valid.. think of this how to handle as we thought writeback request is of block size
-                    new_packet.block_offset = WQ.entry[index].block_offset;
-            //         // writeback_packet.data_value = WQ.entry[index].data_value;        // todo:: data value is array, memcopy it later
-
-                    lower_level->add_rq(&new_packet);
-                }
-            }
-            else
-            {
-                cout << "This also cant happen" << endl;
-            }
 
             if (filled)
-                filled =  fill_cache_tag(tag_array_set, &WQ.entry[index]);      
-            isBypass = true;        // not using anywhere just kept ot identify above request is bypass request
-            if (filled)
+            {    
+                fill_cache_tag(tag_array_set, &WQ.entry[index]);      
                 sim_llc_tag_miss_data_miss[writeback_cpu][WQ.entry[index].type]++;
+            }
         }
 
         if (filled)
         {
-            if (WQ.entry[index].fill_level < fill_level)
-            {
-                cout << "This also cant happen 2" << endl;
-                if (WQ.entry[index].instruction)
-                    upper_level_icache[writeback_cpu]->return_data(&WQ.entry[index]);
-                if (WQ.entry[index].is_data)
-                    upper_level_dcache[writeback_cpu]->return_data(&WQ.entry[index]);
-            }
-
             sim_llc_access[writeback_cpu][WQ.entry[index].type]++;
-
-            
-        //     if (warmup_complete[writeback_cpu])
-        // {
-        // cout << "Handle write accesses: " << sim_llc_access[writeback_cpu][WQ.entry[index].type] << endl;
-        // cout << "Handle write misses: " << sim_llc_tag_miss_data_miss[writeback_cpu][WQ.entry[index].type] << ", " << sim_llc_tag_hit_data_miss[writeback_cpu][WQ.entry[index].type] << endl;
-        // cout << "Handle write hits: " << sim_llc_tag_hit_data_hit[writeback_cpu][WQ.entry[index].type] << endl;
-        // }
             WQ.remove_queue(&WQ.entry[index]);
         }
     }
@@ -472,24 +449,28 @@ void REUSE_CACHE_LLC::reuse_cache_llc_replacement_final_stats()
             cout << " DEMAND     ACCESS: " << setw(10) << DEMAND_ACCESS << "  HIT: " << setw(10) << DEMAND_HIT << "  MISS: " << setw(10) << DEMAND_MISS << "  HIT %: " << setw(10) << ((double)DEMAND_HIT * 100 / DEMAND_ACCESS) << "  MISS %: " << setw(10) << ((double)DEMAND_MISS * 100 / DEMAND_ACCESS) << "   MPKI: " << ((double)DEMAND_MISS * 1000 / num_instrs) << endl;
         }
 
-        if (sim_llc_access[cpu][3] > 0)
+        if (sim_llc_access[i][3] > 0)
         {
-            uint64_t WB_MISS = sim_llc_tag_miss_data_miss[cpu][3] + sim_llc_tag_hit_data_miss[cpu][3];
-            uint64_t WB_HIT  = sim_llc_tag_hit_data_hit[cpu][3];
-            cout << NAME << " WRITEBACK ACCESS: " << setw(10) << sim_llc_access[cpu][3] << "  HIT: "    << setw(10) << WB_HIT << "  MISS: "   << setw(10) << WB_MISS << "  HIT %: "  << setw(10) << (sim_llc_access[cpu][3] ? (double)WB_HIT * 100 / sim_llc_access[cpu][3] : 0) << "  MISS %: " << setw(10) << (sim_llc_access[cpu][3] ? (double)WB_MISS * 100 / sim_llc_access[cpu][3] : 0) << "  MPKI: "   << (num_instrs ? (double)WB_MISS * 1000 / num_instrs : 0) << endl;
+            uint64_t WB_MISS = sim_llc_tag_miss_data_miss[i][3] + sim_llc_tag_hit_data_miss[i][3];
+            uint64_t WB_HIT  = sim_llc_tag_hit_data_hit[i][3];
+            cout << NAME << " WRITEBACK ACCESS: " << setw(10) << sim_llc_access[i][3] << "  HIT: "    << setw(10) << WB_HIT << "  MISS: "   << setw(10) << WB_MISS << "  HIT %: "  << setw(10) << (sim_llc_access[i][3] ? (double)WB_HIT * 100 / sim_llc_access[i][3] : 0) << "  MISS %: " << setw(10) << (sim_llc_access[i][3] ? (double)WB_MISS * 100 / sim_llc_access[i][3] : 0) << "  MPKI: "   << (num_instrs ? (double)WB_MISS * 1000 / num_instrs : 0) << endl;
+            cout << NAME << " WRITEBACK_TAG_HIT_DATA_HIT: " << setw(10) << sim_llc_tag_hit_data_hit[i][3] << " WRITEBACK_TAG_MISS_DATA_MISS: " <<  setw(10) << sim_llc_tag_miss_data_miss[i][3] << " WRITEBACK_TAG_HIT_DATA_MISS: " << setw(10) << sim_llc_tag_hit_data_miss[i][3] << endl;
         }
 
-        if (sim_llc_access[cpu][4] > 0)
+        if (sim_llc_access[i][4] > 0)
         {
-            uint64_t LT_MISS = sim_llc_tag_miss_data_miss[cpu][4] + sim_llc_tag_hit_data_miss[cpu][4];
-            uint64_t LT_HIT  = sim_llc_tag_hit_data_hit[cpu][4];
-            cout << NAME << " LOAD TRANSLATION ACCESS: " << setw(10) << sim_llc_access[cpu][4] << "  HIT: "    << setw(10) << LT_HIT << "  MISS: "   << setw(10) << LT_MISS << "  HIT %: "  << setw(10) << (sim_llc_access[cpu][4] ? (double)LT_HIT * 100 / sim_llc_access[cpu][4] : 0) << "  MISS %: " << setw(10) << (sim_llc_access[cpu][4] ? (double)LT_MISS * 100 / sim_llc_access[cpu][4] : 0) << "  MPKI: "   << (num_instrs ? (double)LT_MISS * 1000 / num_instrs : 0) << endl;
+            uint64_t LT_MISS = sim_llc_tag_miss_data_miss[i][4] + sim_llc_tag_hit_data_miss[i][4];
+            uint64_t LT_HIT  = sim_llc_tag_hit_data_hit[i][4];
+            cout << NAME << " LOAD TRANSLATION ACCESS: " << setw(10) << sim_llc_access[i][4] << "  HIT: "    << setw(10) << LT_HIT << "  MISS: "   << setw(10) << LT_MISS << "  HIT %: "  << setw(10) << (sim_llc_access[i][4] ? (double)LT_HIT * 100 / sim_llc_access[i][4] : 0) << "  MISS %: " << setw(10) << (sim_llc_access[i][4] ? (double)LT_MISS * 100 / sim_llc_access[i][4] : 0) << "  MPKI: "   << (num_instrs ? (double)LT_MISS * 1000 / num_instrs : 0) << endl;
         }
 
         cout << NAME << " TAG_MISS_DATA_MISS: " << setw(10) << TAG_MISS_DATA_MISS << "  MPKI: " << ((double)TAG_MISS_DATA_MISS * 1000 / num_instrs) << endl;
         cout << NAME << " TAG_HIT_DATA_MISS: "  << setw(10) << TAG_HIT_DATA_MISS << "  MPKI: " << ((double)TAG_HIT_DATA_MISS * 1000 / num_instrs)  << endl;
         cout << NAME << " TAG_HIT_DATA_HIT: "   << setw(10) << TAG_HIT_DATA_HIT << "  MPKI: " << ((double)TAG_HIT_DATA_HIT * 1000 / num_instrs) << endl;
 
+        cout << NAME << " DEMAND_TAG_MISS_DATA_MISS: " << setw(10) << DEMAND_TAG_MISS_DATA_MISS << "  MPKI: " << ((double)DEMAND_TAG_MISS_DATA_MISS * 1000 / num_instrs) << endl;
+        cout << NAME << " DEMAND_TAG_HIT_DATA_MISS: "  << setw(10) << DEMAND_TAG_HIT_DATA_MISS << "  MPKI: " << ((double)DEMAND_TAG_HIT_DATA_MISS * 1000 / num_instrs)  << endl;
+        cout << NAME << " DEMAND_TAG_HIT_DATA_HIT: "   << setw(10) << DEMAND_TAG_HIT_DATA_HIT << "  MPKI: " << ((double)DEMAND_TAG_HIT_DATA_HIT * 1000 / num_instrs) << endl;
 
         if (RQ.ACCESS)
             cout << NAME << " RQ ACCESS: " << setw(10) << RQ.ACCESS << "	FORWARD: " << setw(10) << RQ.FORWARD << "	MERGED: " << setw(10) << RQ.MERGED << "	TO_CACHE: " << setw(10) << RQ.TO_CACHE << endl;
@@ -516,10 +497,10 @@ void REUSE_CACHE_LLC::reuse_cache_llc_replacement_final_stats()
 
         cout << "LLC_RESIDENT_BLOCKS_NUM_USES_START" << endl;
         map<uint32_t, uint32_t> resident_uses;
-        for(int i = 0; i < NUM_DATA_ARRAY_SETS; i++)
+        for(int k = 0; k < NUM_DATA_ARRAY_SETS; k++)
             for(int j = 0; j < NUM_DATA_ARRAY_WAYS; j++)
-                if(data_array[i][j].valid == 1)
-                    resident_uses[data_array[i][j].num_uses]++;
+                if(data_array[k][j].valid == 1)
+                    resident_uses[data_array[k][j].num_uses]++;
 
         int resident_total = 0;
         for (auto &use : resident_uses)
@@ -602,7 +583,7 @@ int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
 
     if (tag_array[tag_array_set][tag_victim].valid && tag_array[tag_array_set][tag_victim].hasData)
     {
-        if (tag_array[tag_array_set][tag_victim].forward_backward_pointer->dirty)
+        if (tag_array[tag_array_set][tag_victim].forward_backward_pointer->valid && tag_array[tag_array_set][tag_victim].forward_backward_pointer->dirty)
         {
             if (lower_level)
             {
@@ -621,7 +602,7 @@ int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
                     writeback_packet.cpu = packet->cpu;
                     writeback_packet.address = tag_array[tag_array_set][tag_victim].address;
                     writeback_packet.full_addr = tag_array[tag_array_set][tag_victim].full_addr;
-                    writeback_packet.data = tag_array[tag_array_set][tag_victim].data;
+                    writeback_packet.data = tag_array[tag_array_set][tag_victim].forward_backward_pointer->data;
                     writeback_packet.instr_id = 0;
                     writeback_packet.ip = 0; // writeback does not have ip
                     writeback_packet.type = WRITEBACK;
@@ -656,8 +637,8 @@ int REUSE_CACHE_LLC::fill_cache_tag(uint32_t tag_array_set, PACKET *packet)
     tag_array[tag_array_set][tag_victim].confidence = packet->confidence;
 
     tag_array[tag_array_set][tag_victim].hasData = false;
-    tag_array[tag_array_set][tag_victim].nrr = 1;
     tag_array[tag_array_set][tag_victim].forward_backward_pointer = nullptr;
+    tag_array[tag_array_set][tag_victim].nrr = 1;
 
     return 1;
 }
@@ -704,6 +685,7 @@ int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_
     {
         num_uses_before_eviction[data_array[data_array_set][data_array_way].num_uses]++;
         data_array[data_array_set][data_array_way].forward_backward_pointer->hasData = false;
+        data_array[data_array_set][data_array_way].forward_backward_pointer->forward_backward_pointer = nullptr;
         data_array[data_array_set][data_array_way].valid = 0;
     }
 
@@ -731,7 +713,6 @@ int REUSE_CACHE_LLC::fill_cache_data(uint32_t tag_array_set, uint32_t tag_array_
     tag_array[tag_array_set][tag_array_way].forward_backward_pointer = &data_array[data_array_set][data_array_way];
     data_array[data_array_set][data_array_way].forward_backward_pointer = &tag_array[tag_array_set][tag_array_way];
 
-    tag_array[tag_array_set][tag_array_way].nrr = 0;    // data exists only when tag hits i.e. recently reused
     // data_array[data_array_set][data_array_way].nru = 1;
     data_array[data_array_set][data_array_way].num_uses = 0;
 
@@ -763,7 +744,11 @@ uint32_t REUSE_CACHE_LLC::reuse_cache_llc_find_tag_array_victim(uint32_t tag_arr
         }
     }
 
-    // // todo:: will there be a case where nrr be not 1 for all entries and valid? i dont think so... 
+    // when all tag entries in the set have nrr = 0 then resetting everything to 1 and selecting one of them as victim
+    for (int i = 0; i < NUM_TAG_ARRAY_WAYS; i++)
+    {
+        tag_array[tag_array_set][i].nrr = 1;
+    }
     rr_ptr_tag_array[tag_array_set] = (start + 1) % NUM_TAG_ARRAY_WAYS;
     return start;
 }

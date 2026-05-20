@@ -816,7 +816,7 @@ void CACHE::handle_writeback()
             // mark dirty
             block[set][way].dirty = 1;
             block[set][way].used = 1;
-            block[set][way].num_uses++;
+            if(WQ.entry[index].type != WRITEBACK) block[set][way].num_uses++;
             // block[set][way].data_value = WQ.entry[index].data_value;
             block[set][way].data = WQ.entry[index].data;
             memcpy(block[set][way].data_value+WQ.entry[index].block_offset, WQ.entry[index].data_value, WQ.entry[index].data_size);
@@ -3600,8 +3600,9 @@ int CACHE::add_wq(PACKET *packet)
 
     if (index != -1)
     {
-        if((cache_type != IS_L1D) || ((cache_type == IS_L1D) && ((WQ.entry[index].full_virtual_address == packet->full_virtual_address) && (WQ.entry[index].data_size == packet->data_size))))
-        {if (WQ.entry[index].cpu != packet->cpu)
+        // if((cache_type != IS_L1D) || ((cache_type == IS_L1D) && ((WQ.entry[index].full_virtual_address == packet->full_virtual_address) && (WQ.entry[index].data_size == packet->data_size))))
+        // {
+        if (WQ.entry[index].cpu != packet->cpu)
         {
             cout << "Write request from CPU " << packet->cpu << " merging with Write request from CPU " << WQ.entry[index].cpu << endl;
             assert(0);
@@ -3611,14 +3612,14 @@ int CACHE::add_wq(PACKET *packet)
         WQ.ACCESS++;
 
         return index; // merged index
-        }
-        else
-        {
-            // waw_count++;
-            // cout << "WAW dependency" << "WQ: index = " << index << ", addr = " << hex << WQ.entry[index].full_virtual_address << dec << ", size = " << (int)WQ.entry[index].data_size <<  ",instr_id = " << WQ.entry[index].instr_id << endl;
-            // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
-            return -2;
-        }
+        // }
+        // else
+        // {
+        //     // waw_count++;
+        //     // cout << "WAW dependency" << "WQ: index = " << index << ", addr = " << hex << WQ.entry[index].full_virtual_address << dec << ", size = " << (int)WQ.entry[index].data_size <<  ",instr_id = " << WQ.entry[index].instr_id << endl;
+        //     // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
+        //     return -2;
+        // }
     }
 
     // sanity check
