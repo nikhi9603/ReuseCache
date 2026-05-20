@@ -1,40 +1,25 @@
 #!/bin/bash
 
-NORMAL_TRACER="../Tracers/ConventionalTracer/obj-intel64/champsim_tracer.so"
-# DATA_TRACER="../Tracers/DataTracer/obj-intel64/champsim_tracer.so"
+CONVENTIONAL_NORMAL_PROGRAM="ConventionalCache/bin/champsim"
+# REUSE_NORMAL_PROGRAM="ReuseCache/bin/champsim"
 
-# CONVENTIONAL_DATA_PROGRAM="../ConventionalCacheWithData/bin/champsim"
-# REUSE_DATA_PROGRAM="../ReuseCacheWithData/bin/champsim"
-
-CONVENTIONAL_NORMAL_PROGRAM="../ConventionalCache/bin/champsim"
-REUSE_NORMAL_PROGRAM="../ReuseCache/bin/champsim"
-
-ONNX_RUNTIME_DIR="ONNX-Runtime-Inference"
-TRACES_DIR="data/models"
+TRACES_DIR="speccpu-traces"
 
 NORMAL_OUTPUT_DIR="SpecOutputs_Normal"
 mkdir -p "$NORMAL_OUTPUT_DIR"
 cd "$NORMAL_OUTPUT_DIR" || exit 1
 mkdir -p conventional_output
-mkdir -p reuse_cache_output
-
-# mkdir -p conventional_output_40
-# mkdir -p reuse_cache_output_40
+# mkdir -p reuse_cache_output
 
 cd .. || exit 1
 
-# DATA_OUTPUT_DIR="MLOutputs_Data"
-# mkdir -p "$DATA_OUTPUT_DIR"
-# cd "$DATA_OUTPUT_DIR" || exit 1
-# mkdir -p conventional_output
-# mkdir -p reuse_cache_output
+# cd "$ONNX_RUNTIME_DIR" || exit 1
 
-cd speccpu-traces || exit 1
-
-NUM_JOBS=4
+NUM_JOBS=6
 
 job_count=0
 
+if [ $# -eq 0 ]; then
 traces=(
   400.perlbench-50B.champsimtrace.xz    
   401.bzip2-7B.champsimtrace.xz  
@@ -49,6 +34,11 @@ traces=(
   445.gobmk-17B.champsimtrace.xz
   657.xz_s-56B.champsimtrace.xz       
 )
+else
+    traces=("$@")
+fi
+
+
 # for f in "$TRACES_DIR"/*.onnx; do
 #     traces+=("$f")
 # done
@@ -78,22 +68,23 @@ run_simulation() {
     local TRACE="$1"
     local BASENAME=$(basename "$TRACE")
 
-    local SIMULATION=200000000
+    local SIMULATION=400000000
     local WARMUP=80000000
     
-    # local CONVENTIONAL_OUTPUT_FILE="../$NORMAL_OUTPUT_DIR/conventional_output/${BASENAME%.xz}.out"
-    local REUSE_OUTPUT_FILE="../$NORMAL_OUTPUT_DIR/reuse_cache_output/${BASENAME%.xz}.out"
+    local CONVENTIONAL_OUTPUT_FILE="$NORMAL_OUTPUT_DIR/conventional_output/${BASENAME%.xz}.out"
+    # local REUSE_OUTPUT_FILE="$NORMAL_OUTPUT_DIR/reuse_cache_output/${BASENAME%.xz}.out"
 
     echo "Running trace $BASENAME"
     # echo "$PROGRAM --warmup_instructions $WARMUP --simulation_instructions $SIMULATION -traces $TRACE > $OUTPUT_FILE"
-    # $CONVENTIONAL_NORMAL_PROGRAM --warmup_instructions "$WARMUP" --simulation_instructions "$SIMULATION" -traces "$TRACE" > "$CONVENTIONAL_OUTPUT_FILE" 2>&1
-    $REUSE_NORMAL_PROGRAM --warmup_instructions "$WARMUP" --simulation_instructions "$SIMULATION" --reuse_cache_llc -traces "$TRACE" > "$REUSE_OUTPUT_FILE" 2>&1
+    $CONVENTIONAL_NORMAL_PROGRAM --warmup_instructions "$WARMUP" --simulation_instructions "$SIMULATION" -traces "$TRACE" > "$CONVENTIONAL_OUTPUT_FILE" 2>&1
+    # $REUSE_NORMAL_PROGRAM --warmup_instructions "$WARMUP" --simulation_instructions "$SIMULATION" -traces "$TRACE" > "$REUSE_OUTPUT_FILE" 2>&1
+    echo "Simulation for $TRACE completed"
 }
 
 
 #Loop through model
 for trace in "${traces[@]}"; do
-    run_simulation "$trace" &
+    run_simulation "$TRACES_DIR/$trace" &
     ((job_count++))
 
     # Limit parallel jobs

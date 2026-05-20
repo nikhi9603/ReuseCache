@@ -35,18 +35,22 @@ NUM_JOBS=1
 
 job_count=0
 
+if [ $# -eq 0 ]; then
 models=(
         # "densenet-12.onnx"
         # "densenet-12-int8.onnx"
-        "mobilenetv2-12.onnx"
-        "mobilenetv2-12-int8.onnx"
+        # "mobilenetv2-12.onnx"
+        # "mobilenetv2-12-int8.onnx"
         # "resnet18-v1-7.onnx"
         # "resnet50-v1-12.onnx"
-        "shufflenet-v2-12.onnx"
-        "shufflenet-v2-12-int8.onnx"
-        "squeezenet1.1-7.onnx"
+        # "shufflenet-v2-12.onnx"
+        # "shufflenet-v2-12-int8.onnx"
+        # "squeezenet1.1-7.onnx"
         )
-        # "vgg16-bn-7.onnx")
+else
+    models=("$@")
+fi
+
 # for f in "$MODELS_DIR"*.onnx; do
 #     models+=("$f")
 # done
@@ -58,9 +62,15 @@ generate_trace_and_run() {
     # echo "Generating trace for $model_name"
     # ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$NORMAL_TRACER" -o "$model_name.champsim.normal.trace" -- build/src/inference --use_cpu $model > /dev/null 2>&1
 
-    # tracing into output data trace file acc to marker mode/
-    ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$DATA_TRACER" -w "1" -m "1" -k "2500000000" -o "$model_name.champsim.data.trace" -- build/src/inference --use_cpu $model > "$model_name.marker_mode.debugTrace.txt"
+    # not tracing into output data trace file and just doing marker mode/
+    # ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$DATA_TRACER" -w "1" -m "1" -k "2500000000" -o "$model_name.champsim.data.trace" -- build/src/inference --use_cpu $model > "$model_name.marker_mode.debugTrace.txt"
     
+    # not tracing into output data trace file and no marker mode, just based on -s -t
+    # ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$DATA_TRACER" -w "0" -s "100" -t "100" -- build/src/inference --use_cpu $model > "$model_name.non-marker.debugTrace.txt"
+
+    # tracing into output data trace file based on your s and t values from above without tracing
+    # ../Tools/pin-3.20-98437-gf02b61307-gcc-linux/pin -t "$DATA_TRACER" -o "$model_name.champsim.data.trace" -s "100" -t "100" -- build/src/inference --use_cpu $model > "$model_name.trace-writing.debugTrace.txt"
+
     echo "Running simulation for $model_name"
     # $CONVENTIONAL_NORMAL_PROGRAM --warmup_instructions 80000000 --simulation_instructions 200000000 --uncompressed_trace -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/conventional_output/${model_name}.out" 2>&1
     # $REUSE_NORMAL_PROGRAM --warmup_instructions 80000000 --simulation_instructions 200000000 --uncompressed_trace --reuse_cache_llc -traces "$model_name.champsim.normal.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
@@ -85,18 +95,18 @@ generate_trace_and_run() {
     echo "Warmup: $WARMUP_INSTR"
     echo "Simulate: $SIMULATION_INSTR"
 
-    # gdb -ex run -ex bt -ex quit --args $CONVENTIONAL_DATA_PROGRAM \
-    # --warmup_instructions "$WARMUP_INSTR" \
-    # --simulation_instructions "$SIMULATION_INSTR" \
-    # --uncompressed_trace \
-    # -traces "$model_name.champsim.data.trace" > "$model_name-conventional-output.txt"
-
-    
-    gdb -ex run -ex bt -ex quit --args $REUSE_DATA_PROGRAM \
+    gdb -ex run -ex bt -ex quit --args $CONVENTIONAL_DATA_PROGRAM \
     --warmup_instructions "$WARMUP_INSTR" \
     --simulation_instructions "$SIMULATION_INSTR" \
     --uncompressed_trace \
-    -traces "$model_name.champsim.data.trace" > "$model_name-reuse-output.txt"
+    -traces "$model_name.champsim.data.trace" > "$model_name-conventional-output.txt"
+
+    
+    # gdb -ex run -ex bt -ex quit --args $REUSE_DATA_PROGRAM \
+    # --warmup_instructions "$WARMUP_INSTR" \
+    # --simulation_instructions "$SIMULATION_INSTR" \
+    # --uncompressed_trace \
+    # -traces "$model_name.champsim.data.trace" > "$model_name-reuse-output.txt"
     
     # $REUSE_DATA_PROGRAM --warmup_instructions 50000000 --simulation_instructions 400000000 --uncompressed_trace -traces "$model_name.champsim.data.trace" > "../$NORMAL_OUTPUT_DIR/reuse_cache_output/${model_name}.out" 2>&1
 
