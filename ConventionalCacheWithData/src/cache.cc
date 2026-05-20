@@ -816,7 +816,7 @@ void CACHE::handle_writeback()
             // mark dirty
             block[set][way].dirty = 1;
             block[set][way].used = 1;
-            block[set][way].num_uses++;
+            if(WQ.entry[index].type != WRITEBACK) block[set][way].num_uses++;
             // block[set][way].data_value = WQ.entry[index].data_value;
             block[set][way].data = WQ.entry[index].data;
             memcpy(block[set][way].data_value+WQ.entry[index].block_offset, WQ.entry[index].data_value, WQ.entry[index].data_size);
@@ -827,7 +827,7 @@ void CACHE::handle_writeback()
             else if (cache_type == IS_DTLB)
                 WQ.entry[index].data_pa = block[set][way].data;
 
-            WQ.entry[index].data = block[set][way].data;
+            // WQ.entry[index].data = block[set][way].data;
 
             // check fill level
             if (WQ.entry[index].fill_level < fill_level)
@@ -3600,8 +3600,12 @@ int CACHE::add_wq(PACKET *packet)
 
     if (index != -1)
     {
-        if((cache_type != IS_L1D) || ((cache_type == IS_L1D) && ((WQ.entry[index].full_virtual_address == packet->full_virtual_address) && (WQ.entry[index].data_size == packet->data_size))))
-        {if (WQ.entry[index].cpu != packet->cpu)
+        // for now removing the newly added checks for WAW as these changes alone may not be sufficient and while merging, since data consistency is still not yet done, byte masks are not considered
+        // So keeping to earlier changes only. Basically this will be the case where partial overlap might happen and one can still merge the write requests
+        // But partial overlaps of other kind where start addr is not same is considered as not index = -1 i.e. same request not present in wq bcz of comparing full addr (Not sure why even earlier they have considered that when earlier it was all cache line level)
+        // if((cache_type != IS_L1D) || ((cache_type == IS_L1D) && ((WQ.entry[index].full_virtual_address == packet->full_virtual_address) && (WQ.entry[index].data_size == packet->data_size))))
+        // {
+        if (WQ.entry[index].cpu != packet->cpu)
         {
             cout << "Write request from CPU " << packet->cpu << " merging with Write request from CPU " << WQ.entry[index].cpu << endl;
             assert(0);
@@ -3611,14 +3615,14 @@ int CACHE::add_wq(PACKET *packet)
         WQ.ACCESS++;
 
         return index; // merged index
-        }
-        else
-        {
-            // waw_count++;
-            // cout << "WAW dependency" << "WQ: index = " << index << ", addr = " << hex << WQ.entry[index].full_virtual_address << dec << ", size = " << (int)WQ.entry[index].data_size <<  ",instr_id = " << WQ.entry[index].instr_id << endl;
-            // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
-            return -2;
-        }
+        // }
+        // else
+        // {
+        //     // waw_count++;
+        //     // cout << "WAW dependency" << "WQ: index = " << index << ", addr = " << hex << WQ.entry[index].full_virtual_address << dec << ", size = " << (int)WQ.entry[index].data_size <<  ",instr_id = " << WQ.entry[index].instr_id << endl;
+        //     // cout << "pkt addr: " << hex << packet->full_virtual_address << dec << ", size = " << (int)packet->data_size << ", instr_id = " << packet->instr_id << endl;
+        //     return -2;
+        // }
     }
 
     // sanity check

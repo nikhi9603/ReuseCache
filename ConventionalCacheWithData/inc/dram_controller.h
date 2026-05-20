@@ -3,7 +3,7 @@
 
 #include "memory_class.h"
 
-// DRAM configurationfrequency
+// DRAM configuration
 #define DRAM_CHANNEL_WIDTH 8 // 8B
 #define DRAM_WQ_SIZE 64
 #define DRAM_RQ_SIZE 64

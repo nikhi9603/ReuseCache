@@ -103,7 +103,7 @@ void PAGE_TABLE_WALKER::operate()
                     MSHR.entry[index].event_cycle = current_core_cycle[cpu];	
 
 
-                MSHR.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (MSHR.entry[index].full_virtual_address && ((1<<LOG2_PAGE_SIZE) - 1)); //Return the translated physical address to STLB
+                MSHR.entry[index].data = next_level_base_addr << LOG2_PAGE_SIZE | (MSHR.entry[index].full_virtual_address & ((1<<LOG2_PAGE_SIZE) - 1)); //Return the translated physical address to STLB
 
                 if (knob_cloudsuite)
                 {
