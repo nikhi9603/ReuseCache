@@ -1,0 +1,19 @@
+
+========== TRACE GENERATION SUMMARY ==========
+Total instructions executed:     8713163
+Skip instructions :          18446744073709551615
+Trace instructions:         0
+
+--- Phase Boundaries (instrCount values) ---
+  Marker 1 [PREPROCESSING_START]: NOT SEEN
+  Marker 2 [PREPROCESSING_END]: NOT SEEN
+  Marker 3 [INFERENCE_PASS1_START]: NOT SEEN
+  Marker 4 [INFERENCE_PASS1_END]: NOT SEEN
+  Marker 5 [INFERENCE_PASS2_END]: NOT SEEN
+
+--- Memory Access Stats ---
+Skip Instruction count = 0
+Skip Read Instruction count = 0
+Skip Write Instruction count = 0
+Unaligned access count = 0
+==============================================

@@ -1,0 +1,230 @@
+Skipped 10000000 instructions
+Skipped 20000000 instructions
+Skipped 30000000 instructions
+Skipped 40000000 instructions
+Skipped 50000000 instructions
+Skipped 60000000 instructions
+Inference Execution Provider: CPU
+Skipped 70000000 instructions
+Skipped 80000000 instructions
+Skipped 90000000 instructions
+Skipped 100000000 instructions
+Skipped 110000000 instructions
+Skipped 120000000 instructions
+Skipped 140000000 instructions
+Skipped 150000000 instructions
+Skipped 160000000 instructions
+Skipped 170000000 instructions
+Skipped 180000000 instructions
+Skipped 190000000 instructions
+Skipped 200000000 instructions
+Skipped 210000000 instructions
+Skipped 230000000 instructions
+Skipped 240000000 instructions
+Skipped 250000000 instructions
+Skipped 260000000 instructions
+Skipped 280000000 instructions
+Skipped 290000000 instructions
+Skipped 300000000 instructions
+Skipped 310000000 instructions
+Skipped 320000000 instructions
+Skipped 330000000 instructions
+Skipped 340000000 instructions
+Skipped 350000000 instructions
+Skipped 360000000 instructions
+Skipped 370000000 instructions
+Skipped 380000000 instructions
+Skipped 390000000 instructions
+Skipped 400000000 instructions
+Skipped 410000000 instructions
+Skipped 420000000 instructions
+Skipped 430000000 instructions
+Skipped 440000000 instructions
+Skipped 450000000 instructions
+Skipped 460000000 instructions
+Skipped 470000000 instructions
+Skipped 480000000 instructions
+Skipped 490000000 instructions
+Skipped 500000000 instructions
+Skipped 510000000 instructions
+Skipped 520000000 instructions
+Skipped 530000000 instructions
+Skipped 540000000 instructions
+Skipped 550000000 instructions
+Skipped 560000000 instructions
+Skipped 570000000 instructions
+Skipped 580000000 instructions
+Skipped 590000000 instructions
+Skipped 600000000 instructions
+Skipped 610000000 instructions
+Skipped 620000000 instructions
+Skipped 630000000 instructions
+Skipped 640000000 instructions
+Skipped 650000000 instructions
+Skipped 660000000 instructions
+Skipped 670000000 instructions
+Skipped 680000000 instructions
+Skipped 690000000 instructions
+Skipped 700000000 instructions
+Skipped 710000000 instructions
+Skipped 730000000 instructions
+Skipped 740000000 instructions
+Skipped 750000000 instructions
+Skipped 760000000 instructions
+Default batch size. Setting input batch size to 1.
+Number of Input Nodes: 1
+Number of Output Nodes: 1
+Input Name: data_0
+Input Type: float
+Input Dimensions: [1, 3, 224, 224]
+Output Name: fc6_1
+Output Type: float
+Output Dimensions: [1, 1000, 1, 1]
+>>> MARKER 1 [PREPROCESSING_START] at instrCount = 767819853
+Skipped 770000000 instructions
+Skipped 780000000 instructions
+Skipped 790000000 instructions
+Skipped 800000000 instructions
+Skipped 810000000 instructions
+Skipped 820000000 instructions
+Skipped 830000000 instructions
+Skipped 840000000 instructions
+Skipped 850000000 instructions
+>>> MARKER 2 [PREPROCESSING_END] at instrCount = 853414714
+    Preprocessing instructions: 85594861
+Init time: 7517 ms
+Running inference...
+>>> MARKER 3 [INFERENCE_PASS1_START] at instrCount = 853416813
+Traced 10000000 instructions
+Traced 20000000 instructions
+Traced 30000000 instructions
+Traced 40000000 instructions
+Traced 50000000 instructions
+Traced 60000000 instructions
+Traced 70000000 instructions
+Traced 80000000 instructions
+Traced 90000000 instructions
+Traced 100000000 instructions
+Traced 110000000 instructions
+Traced 120000000 instructions
+Traced 130000000 instructions
+Traced 140000000 instructions
+Traced 150000000 instructions
+Traced 160000000 instructions
+Traced 170000000 instructions
+Traced 180000000 instructions
+Traced 190000000 instructions
+Traced 200000000 instructions
+Traced 210000000 instructions
+Traced 220000000 instructions
+Traced 230000000 instructions
+Traced 240000000 instructions
+Traced 250000000 instructions
+Traced 260000000 instructions
+Traced 280000000 instructions
+Traced 290000000 instructions
+Traced 300000000 instructions
+Traced 310000000 instructions
+Traced 320000000 instructions
+Traced 330000000 instructions
+Traced 340000000 instructions
+Traced 350000000 instructions
+Traced 360000000 instructions
+Traced 370000000 instructions
+Traced 380000000 instructions
+Traced 390000000 instructions
+Traced 400000000 instructions
+Traced 410000000 instructions
+Traced 420000000 instructions
+Traced 430000000 instructions
+Traced 440000000 instructions
+Traced 450000000 instructions
+Traced 460000000 instructions
+Traced 470000000 instructions
+Traced 480000000 instructions
+Traced 490000000 instructions
+Traced 500000000 instructions
+Traced 510000000 instructions
+Traced 520000000 instructions
+Traced 530000000 instructions
+Traced 540000000 instructions
+Traced 550000000 instructions
+Traced 560000000 instructions
+Traced 570000000 instructions
+Traced 580000000 instructions
+Traced 590000000 instructions
+Traced 600000000 instructions
+Traced 610000000 instructions
+Traced 620000000 instructions
+Traced 630000000 instructions
+Traced 640000000 instructions
+Traced 650000000 instructions
+Traced 660000000 instructions
+Traced 670000000 instructions
+Traced 680000000 instructions
+Traced 690000000 instructions
+Traced 700000000 instructions
+Traced 710000000 instructions
+Traced 720000000 instructions
+Traced 730000000 instructions
+Traced 740000000 instructions
+Traced 750000000 instructions
+Traced 760000000 instructions
+Traced 770000000 instructions
+Traced 780000000 instructions
+Traced 790000000 instructions
+Traced 800000000 instructions
+Traced 810000000 instructions
+Traced 820000000 instructions
+Traced 830000000 instructions
+Traced 840000000 instructions
+Traced 850000000 instructions
+Traced 860000000 instructions
+Traced 870000000 instructions
+Traced 880000000 instructions
+Traced 890000000 instructions
+Traced 900000000 instructions
+Traced 910000000 instructions
+Traced 920000000 instructions
+Traced 930000000 instructions
+Traced 940000000 instructions
+Traced 950000000 instructions
+Traced 960000000 instructions
+Traced 970000000 instructions
+Traced 980000000 instructions
+Traced 990000000 instructions
+Traced 1000000000 instructions
+Traced 1020000000 instructions
+Traced 1030000000 instructions
+Traced 1040000000 instructions
+Traced 1050000000 instructions
+Inference completed.
+First inference time: 5577828 ms
+>>> MARKER 4 [INFERENCE_PASS1_END] at instrCount = 1911111196
+    One inference pass instructions: 1057694383
+
+========== TRACE GENERATION SUMMARY ==========
+Total instructions executed:     1911111196
+Skip instructions :          853416812
+Trace instructions:         1057694385
+
+--- Phase Boundaries (instrCount values) ---
+  Marker 1 [PREPROCESSING_START]: 767819853
+  Marker 2 [PREPROCESSING_END]: 853414714
+  Marker 3 [INFERENCE_PASS1_START]: 853416813
+  Marker 4 [INFERENCE_PASS1_END]: 1911111196
+  Marker 5 [INFERENCE_PASS2_END]: NOT SEEN
+
+Preprocessing instructions:      85594861
+One inference pass instructions: 1057694383
+
+--- Recommended ChampSim Settings ---
+  ChampSim warmup:    211538876  (~20% of one pass)
+  ChampSim simulate:  846155506  (remaining 80% of one pass)
+
+--- Memory Access Stats ---
+Skip Instruction count = 6
+Skip Read Instruction count = 3
+Skip Write Instruction count = 3
+Unaligned access count = 2351776
+==============================================

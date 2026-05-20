@@ -1,0 +1,98 @@
+Skipped 10000000 instructions
+Skipped 20000000 instructions
+Skipped 30000000 instructions
+Skipped 40000000 instructions
+Skipped 50000000 instructions
+Skipped 60000000 instructions
+Inference Execution Provider: CPU
+Skipped 70000000 instructions
+Skipped 80000000 instructions
+Skipped 90000000 instructions
+Skipped 100000000 instructions
+Skipped 110000000 instructions
+Skipped 120000000 instructions
+Skipped 130000000 instructions
+Skipped 140000000 instructions
+Skipped 150000000 instructions
+Skipped 160000000 instructions
+Skipped 170000000 instructions
+Skipped 180000000 instructions
+Skipped 190000000 instructions
+Skipped 200000000 instructions
+Skipped 210000000 instructions
+Skipped 220000000 instructions
+Got dynamic batch size. Setting input batch size to 1.
+Got dynamic batch size. Setting output batch size to 1.
+Number of Input Nodes: 1
+Number of Output Nodes: 1
+Input Name: input
+Input Type: float
+Input Dimensions: [1, 3, 224, 224]
+Output Name: output
+Output Type: float
+Output Dimensions: [1, 1000]
+>>> MARKER 1 [PREPROCESSING_START] at instrCount = 225974831
+Skipped 230000000 instructions
+Skipped 240000000 instructions
+Skipped 250000000 instructions
+Skipped 260000000 instructions
+Skipped 270000000 instructions
+Skipped 280000000 instructions
+Skipped 290000000 instructions
+Skipped 300000000 instructions
+Skipped 310000000 instructions
+>>> MARKER 2 [PREPROCESSING_END] at instrCount = 311524346
+    Preprocessing instructions: 85549515
+Init time: 7728 ms
+Running inference...
+>>> MARKER 3 [INFERENCE_PASS1_START] at instrCount = 311526445
+Traced 10000000 instructions
+Traced 20000000 instructions
+Traced 30000000 instructions
+Traced 40000000 instructions
+Traced 60000000 instructions
+Traced 70000000 instructions
+Traced 80000000 instructions
+Traced 90000000 instructions
+Traced 100000000 instructions
+Traced 110000000 instructions
+Traced 120000000 instructions
+Traced 130000000 instructions
+Traced 140000000 instructions
+Traced 150000000 instructions
+Traced 160000000 instructions
+Traced 170000000 instructions
+Traced 180000000 instructions
+Traced 190000000 instructions
+Traced 200000000 instructions
+Traced 210000000 instructions
+Inference completed.
+First inference time: 1063715 ms
+>>> MARKER 4 [INFERENCE_PASS1_END] at instrCount = 529280302
+    One inference pass instructions: 217753857
+
+========== TRACE GENERATION SUMMARY ==========
+Total instructions executed:     529280302
+Skip instructions :          311526444
+Trace instructions:         217753859
+
+--- Phase Boundaries (instrCount values) ---
+  Marker 1 [PREPROCESSING_START]: 225974831
+  Marker 2 [PREPROCESSING_END]: 311524346
+  Marker 3 [INFERENCE_PASS1_START]: 311526445
+  Marker 4 [INFERENCE_PASS1_END]: 529280302
+  Marker 5 [INFERENCE_PASS2_END]: NOT SEEN
+
+Preprocessing instructions:      85549515
+One inference pass instructions: 217753857
+
+--- Recommended ChampSim Settings ---
+  ChampSim warmup:    43550771  (~20% of one pass)
+  ChampSim simulate:  174203085  (remaining 80% of one pass)
+
+--- Memory Access Stats ---
+Skip Instruction count = 6
+Skip Read Instruction count = 3
+Skip Write Instruction count = 3
+Unaligned access count = 1359557
+==============================================
